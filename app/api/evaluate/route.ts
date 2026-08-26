@@ -62,6 +62,13 @@ function cleanEvaluation(value: Partial<Evaluation>, fallback: Evaluation): Eval
   };
 }
 
+export async function GET() {
+  return Response.json({
+    mode:process.env.AI_EVALUATION_ENDPOINT && process.env.AI_EVALUATION_API_KEY ? 'ai' : 'local',
+    model:process.env.AI_EVALUATION_MODEL || null,
+  });
+}
+
 export async function POST(request: Request) {
   const input = await request.json() as EvaluationRequest;
   if (!input?.question || !input?.answer || !Array.isArray(input?.keyPoints)) return Response.json({ error:'invalid_request' }, { status:400 });
