@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_ORIGIN || 'http://localhost:3000'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_ORIGIN || 'https://yihe-memory.leo527952.chatgpt.site'),
   title: '忆核 — AI 驱动的知识记忆训练',
   description: '用间隔重复和 AI 评估，把面试知识真正变成长期记忆。',
   openGraph: {
