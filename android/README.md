@@ -8,6 +8,8 @@
 2. 在 `android` 目录运行 `./gradlew assembleDebug`。
 3. APK 位于 `app/build/outputs/apk/debug/app-debug.apk`。
 
+仓库同时提供已签名的公开安装包：[下载忆核 Android APK](../downloads/yihe-memory-android.apk)。发布证书 SHA-256 为 `CE:96:E4:02:9F:EF:31:15:16:66:BC:58:A6:2C:A0:EF:E7:D3:FD:99:C8:4A:E6:3A:08:FF:23:67:EE:E4:B2:D7`。
+
 发布版需要使用长期保存的签名证书，并把证书 SHA-256 指纹填入网站的 `/.well-known/assetlinks.json`。没有匹配的 Digital Asset Links 时，应用仍会以带浏览器栏的 Custom Tab 安全打开网站。
 
 构建任务接受 `YIHE_KEYSTORE_PATH`、`YIHE_KEYSTORE_PASSWORD`、`YIHE_KEY_ALIAS` 和 `YIHE_KEY_PASSWORD` 四个 Gradle 属性。签名文件和密码不要提交到 Git。
