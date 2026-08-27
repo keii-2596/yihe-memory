@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_QUESTIONS, dueQuestions, reviewStreak, scheduleReview } from './model.ts';
+import { DEFAULT_QUESTIONS, dueQuestions, parseImportedCards, reviewStreak, scheduleReview } from './model.ts';
 
 const now = new Date('2026-08-26T08:00:00.000Z');
 const question = DEFAULT_QUESTIONS[0];
@@ -21,4 +21,19 @@ test('scheduled cards disappear until their review time', () => {
 test('streak includes consecutive days and tolerates no review today', () => {
   const records = ['2026-08-23','2026-08-24','2026-08-25'].map((date,index) => ({ id:String(index), questionId:'q', category:'数据库', score:80, rating:'good' as const, reviewedAt:`${date}T08:00:00.000Z` }));
   assert.equal(reviewStreak(records, now), 3);
+});
+
+test('higher target retention schedules an earlier review', () => {
+  const first=scheduleReview(question,undefined,'good',85,now);
+  const later=new Date('2026-08-29T08:00:00.000Z');
+  const high=scheduleReview(question,first,'good',85,later,.95);
+  const normal=scheduleReview(question,first,'good',85,later,.85);
+  assert.ok(high.interval<normal.interval);
+});
+
+test('CSV and Markdown can be imported as cards', () => {
+  const csv=parseImportedCards('题目,分类,评分要点,参考答案\n什么是索引？,数据库,加速查询|空间换时间,索引是有序数据结构','cards.csv');
+  const markdown=parseImportedCards('# TCP 三次握手\n- 确认双方收发能力\n- 同步序列号','cards.md');
+  assert.equal(csv.length,1); assert.deepEqual(csv[0].keyPoints,['加速查询','空间换时间']);
+  assert.equal(markdown.length,1); assert.equal(markdown[0].keyPoints.length,2);
 });
