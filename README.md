@@ -6,7 +6,7 @@
 
 - 163 道内置 Java 八股卡片，覆盖语言基础、集合、JVM、并发、Spring、数据库、Redis、消息队列、分布式与系统设计
 - Java 全栈、核心基础、JVM 与并发、Spring 与数据层、分布式等学习路线
-- AI 判题、参考答案自查、追问、本地评分回退与每日调用额度
+- AI 判题、个人 API 配置与连通性测试、参考答案自查、追问、本地评分回退与每日调用额度
 - 文字回答、浏览器语音识别与服务端录音转写
 - 分级提示、按需查看答案、间隔重复与个人预计记住率
 - 每日新学/复习独立上限、复习积压保护、提醒与日历订阅
@@ -39,11 +39,14 @@ pnpm verify
 - `AI_EVALUATION_ENDPOINT`
 - `AI_EVALUATION_API_KEY`
 - `AI_EVALUATION_MODEL`
+- `AI_ALLOWED_ENDPOINT_HOSTS`（允许个人配置使用的额外 HTTPS 域名，逗号分隔）
 - `AI_TRANSCRIPTION_ENDPOINT`
 - `AI_TRANSCRIPTION_MODEL`
 - `NEXT_PUBLIC_SITE_ORIGIN`
 
-浏览器只请求站内 API，不接触模型密钥。`GET /api/evaluate` 也不会返回任何密钥。
+部署者密钥只保存在服务端，`GET /api/evaluate` 不会返回任何密钥。用户也可以在“设置 → AI 判题 → 配置个人 API”中填写 OpenAI Chat Completions 兼容接口、Key 和模型并测试连接。个人 Key 只进入当前标签页的 `sessionStorage`，判题时经站内服务端临时转发，不进入 D1 云同步、导出备份或服务器日志；关闭标签页后自动清除。
+
+个人接口默认允许 OpenAI、DeepSeek、Moonshot、智谱 GLM 和阿里百炼的官方 HTTPS 域名。自托管兼容接口需要部署者把精确域名加入 `AI_ALLOWED_ENDPOINT_HOSTS`；服务端拒绝 HTTP、凭据式 URL、查询参数、非标准端口和重定向，以降低 SSRF 风险。
 
 ## 账号方案
 

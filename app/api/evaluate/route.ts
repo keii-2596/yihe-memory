@@ -2,13 +2,22 @@ import { ensureSchema, getDb } from '../../../db';
 import { getAppUser } from '../../chatgpt-auth';
 
 type EvaluationRequest = {
-  question: string;
-  answer: string;
-  keyPoints: string[];
-  reference: string;
+  question?: string;
+  answer?: string;
+  keyPoints?: string[];
+  reference?: string;
   model?: string;
   dailyLimit?: number;
+  testConnection?: boolean;
+  personalApi?: {
+    endpoint?: string;
+    apiKey?: string;
+    model?: string;
+  };
 };
+
+type EvaluationInput = Required<Pick<EvaluationRequest, 'question'|'answer'|'keyPoints'|'reference'>> & EvaluationRequest;
+type ProviderConfig = { endpoint:string; apiKey:string; model:string; personal:boolean };
 
 type Evaluation = {
   score: number;
@@ -34,7 +43,7 @@ const conceptAliases: Record<string, string[]> = {
   CAP:['cap','一致性','可用性','分区','网络'], React:['state','props','context','memo','重新渲染'],
 };
 
-function localEvaluate(input: EvaluationRequest): Evaluation {
+function localEvaluate(input: EvaluationInput): Evaluation {
   const normalized = input.answer.toLowerCase().replace(/\s+/g, '');
   const hitPoints: string[] = [];
   const missedPoints: string[] = [];
@@ -68,7 +77,36 @@ function cleanEvaluation(value: Partial<Evaluation>, fallback: Evaluation): Eval
 }
 
 const allowedModels=new Set(['gpt-4.1-mini','gpt-4.1','gpt-4o-mini']);
+const personalEndpointHosts=new Set([
+  'api.openai.com',
+  'api.deepseek.com',
+  'api.moonshot.cn',
+  'open.bigmodel.cn',
+  'dashscope.aliyuncs.com',
+  ...(process.env.AI_ALLOWED_ENDPOINT_HOSTS||'').split(',').map(host=>host.trim().toLowerCase()).filter(Boolean),
+]);
 const periodKey=()=>new Date().toISOString().slice(0,10);
+
+function personalProvider(value:EvaluationRequest['personalApi']):ProviderConfig|null {
+  if(!value)return null;
+  const endpoint=String(value.endpoint||'').trim(); const apiKey=String(value.apiKey||'').trim(); const model=String(value.model||'').trim();
+  if(!endpoint||!apiKey||!model)throw new Error('请完整填写接口地址、API Key 和模型');
+  if(endpoint.length>500||apiKey.length>2048||model.length>120||!/^[\w./:-]+$/.test(model))throw new Error('个人 API 配置格式不正确');
+  let url:URL; try{url=new URL(endpoint);}catch{throw new Error('接口地址不是有效 URL');}
+  if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash||!personalEndpointHosts.has(url.hostname.toLowerCase())||(url.port&&url.port!=='443'))throw new Error('该接口地址未被允许，请使用受支持的 HTTPS 服务商');
+  return {endpoint:url.toString(),apiKey,model,personal:true};
+}
+
+function deploymentProvider(input:EvaluationRequest):ProviderConfig|null {
+  const endpoint=process.env.AI_EVALUATION_ENDPOINT; const apiKey=process.env.AI_EVALUATION_API_KEY;
+  if(!endpoint||!apiKey)return null;
+  const model=allowedModels.has(input.model||'')?String(input.model):process.env.AI_EVALUATION_MODEL||'gpt-4.1-mini';
+  return {endpoint,apiKey,model,personal:false};
+}
+
+async function providerRequest(provider:ProviderConfig,body:Record<string,unknown>){
+  return fetch(provider.endpoint,{method:'POST',redirect:'error',signal:AbortSignal.timeout(20000),headers:{'Content-Type':'application/json',Authorization:`Bearer ${provider.apiKey}`},body:JSON.stringify(body)});
+}
 
 async function usageFor(ownerId:string) {
   try { await ensureSchema(); const row=await getDb().prepare('SELECT request_count FROM ai_usage WHERE owner_id = ? AND period = ?').bind(ownerId,periodKey()).first<{request_count:number}>(); return row?.request_count??0; } catch { return 0; }
@@ -88,25 +126,34 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const input = await request.json() as EvaluationRequest;
+  let provider:ProviderConfig|null;
+  try{provider=personalProvider(input.personalApi)||deploymentProvider(input);}catch(error){return Response.json({ok:false,error:error instanceof Error?error.message:'个人 API 配置无效'},{status:400});}
+  if(input.testConnection){
+    if(!input.personalApi||!provider?.personal)return Response.json({ok:false,error:'请先填写个人 API 配置'},{status:400});
+    try{
+      const response=await providerRequest(provider,{model:provider.model,temperature:0,messages:[{role:'user',content:'这是连接测试。请只回复 OK。'}]});
+      if(!response.ok)return Response.json({ok:false,error:`服务商返回 ${response.status}，请检查 Key、模型和接口地址`},{status:502});
+      return Response.json({ok:true,model:provider.model,host:new URL(provider.endpoint).hostname});
+    }catch{return Response.json({ok:false,error:'连接失败，请检查接口地址或稍后重试'},{status:502});}
+  }
   if (!input?.question || !input?.answer || !Array.isArray(input?.keyPoints)) return Response.json({ error:'invalid_request' }, { status:400 });
-  const fallback = localEvaluate(input);
-  const endpoint = process.env.AI_EVALUATION_ENDPOINT;
-  const apiKey = process.env.AI_EVALUATION_API_KEY;
-  if (!endpoint || !apiKey) return Response.json(fallback);
+  const evaluationInput={...input,question:input.question,answer:input.answer,keyPoints:input.keyPoints,reference:String(input.reference||'')} as EvaluationInput;
+  const fallback = localEvaluate(evaluationInput);
+  if (!provider) return Response.json(fallback);
   const chatUser=await getAppUser(); const dailyLimit=Math.max(5,Math.min(100,Number(input.dailyLimit)||30));
   if (chatUser && await usageFor(chatUser.userId)>=dailyLimit) return Response.json({ ...fallback, summary:`今日 AI 判题额度已用完（${dailyLimit} 次），本次使用本地评估。${fallback.summary}` });
 
   const system = `你是一名严格但鼓励式的计算机面试教练。评价答案时关注概念覆盖、逻辑准确和表达清晰，不要求逐字匹配参考答案。只输出 JSON，不要 markdown。字段必须为：score(0-100数字)、verdict(短句)、summary(1-2句)、hitPoints(字符串数组)、missedPoints(字符串数组)、suggestion(一句可执行建议)。`;
-  const userPrompt = JSON.stringify({ question:input.question, answer:input.answer, scoring_points:input.keyPoints, reference_answer:input.reference });
+  const userPrompt = JSON.stringify({ question:evaluationInput.question, answer:evaluationInput.answer, scoring_points:evaluationInput.keyPoints, reference_answer:evaluationInput.reference });
   try {
-    const model=allowedModels.has(input.model||'')?input.model:process.env.AI_EVALUATION_MODEL || 'gpt-4.1-mini'; let response:Response|null=null;
-    for(let attempt=0;attempt<3;attempt++){response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${apiKey}`},body:JSON.stringify({model,temperature:.2,response_format:{type:'json_object'},messages:[{role:'system',content:system},{role:'user',content:userPrompt}]})});if(response.ok)break;if(response.status<500&&response.status!==429)break;}
+    const model=provider.model; let response:Response|null=null;
+    for(let attempt=0;attempt<3;attempt++){response=await providerRequest(provider,{model,temperature:.2,response_format:{type:'json_object'},messages:[{role:'system',content:system},{role:'user',content:userPrompt}]});if(response.ok)break;if(response.status<500&&response.status!==429)break;}
     if (!response) return Response.json(fallback);
     if (!response.ok) return Response.json(fallback);
     const payload = await response.json() as { choices?:Array<{ message?:{ content?:string } }>; evaluation?:Partial<Evaluation> };
     const raw = payload.choices?.[0]?.message?.content;
     const parsed = raw ? JSON.parse(raw) as Partial<Evaluation> : payload.evaluation;
-    if(chatUser)await recordUsage(chatUser.userId,Math.ceil((input.answer.length+input.reference.length)/2));
+    if(chatUser)await recordUsage(chatUser.userId,Math.ceil((evaluationInput.answer.length+evaluationInput.reference.length)/2));
     return Response.json({ ...cleanEvaluation(parsed || {}, fallback),model });
   } catch { return Response.json(fallback); }
 }
