@@ -1,8 +1,13 @@
+import { ensureSchema, getDb } from '../../../db';
+import { getChatGPTUser } from '../../chatgpt-auth';
+
 type EvaluationRequest = {
   question: string;
   answer: string;
   keyPoints: string[];
   reference: string;
+  model?: string;
+  dailyLimit?: number;
 };
 
 type Evaluation = {
@@ -62,10 +67,22 @@ function cleanEvaluation(value: Partial<Evaluation>, fallback: Evaluation): Eval
   };
 }
 
+const allowedModels=new Set(['gpt-4.1-mini','gpt-4.1','gpt-4o-mini']);
+const periodKey=()=>new Date().toISOString().slice(0,10);
+
+async function usageFor(ownerId:string) {
+  try { await ensureSchema(); const row=await getDb().prepare('SELECT request_count FROM ai_usage WHERE owner_id = ? AND period = ?').bind(ownerId,periodKey()).first<{request_count:number}>(); return row?.request_count??0; } catch { return 0; }
+}
+async function recordUsage(ownerId:string,tokens:number) {
+  try { await ensureSchema(); const now=new Date().toISOString(); await getDb().prepare(`INSERT INTO ai_usage (owner_id,period,request_count,estimated_tokens,updated_at) VALUES (?,?,1,?,?) ON CONFLICT(owner_id,period) DO UPDATE SET request_count=request_count+1,estimated_tokens=estimated_tokens+excluded.estimated_tokens,updated_at=excluded.updated_at`).bind(ownerId,periodKey(),tokens,now).run(); } catch { /* evaluation must still work when usage storage is unavailable */ }
+}
+
 export async function GET() {
+  const user=await getChatGPTUser(); const usage=user?await usageFor(user.userId):0;
   return Response.json({
     mode:process.env.AI_EVALUATION_ENDPOINT && process.env.AI_EVALUATION_API_KEY ? 'ai' : 'local',
     model:process.env.AI_EVALUATION_MODEL || null,
+    models:[...allowedModels], usage,
   });
 }
 
@@ -76,18 +93,20 @@ export async function POST(request: Request) {
   const endpoint = process.env.AI_EVALUATION_ENDPOINT;
   const apiKey = process.env.AI_EVALUATION_API_KEY;
   if (!endpoint || !apiKey) return Response.json(fallback);
+  const chatUser=await getChatGPTUser(); const dailyLimit=Math.max(5,Math.min(100,Number(input.dailyLimit)||30));
+  if (chatUser && await usageFor(chatUser.userId)>=dailyLimit) return Response.json({ ...fallback, summary:`今日 AI 判题额度已用完（${dailyLimit} 次），本次使用本地评估。${fallback.summary}` });
 
   const system = `你是一名严格但鼓励式的计算机面试教练。评价答案时关注概念覆盖、逻辑准确和表达清晰，不要求逐字匹配参考答案。只输出 JSON，不要 markdown。字段必须为：score(0-100数字)、verdict(短句)、summary(1-2句)、hitPoints(字符串数组)、missedPoints(字符串数组)、suggestion(一句可执行建议)。`;
-  const user = JSON.stringify({ question:input.question, answer:input.answer, scoring_points:input.keyPoints, reference_answer:input.reference });
+  const userPrompt = JSON.stringify({ question:input.question, answer:input.answer, scoring_points:input.keyPoints, reference_answer:input.reference });
   try {
-    const response = await fetch(endpoint, {
-      method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${apiKey}` },
-      body:JSON.stringify({ model:process.env.AI_EVALUATION_MODEL || 'gpt-4.1-mini', temperature:.2, response_format:{ type:'json_object' }, messages:[{ role:'system', content:system },{ role:'user', content:user }] }),
-    });
+    const model=allowedModels.has(input.model||'')?input.model:process.env.AI_EVALUATION_MODEL || 'gpt-4.1-mini'; let response:Response|null=null;
+    for(let attempt=0;attempt<3;attempt++){response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${apiKey}`},body:JSON.stringify({model,temperature:.2,response_format:{type:'json_object'},messages:[{role:'system',content:system},{role:'user',content:userPrompt}]})});if(response.ok)break;if(response.status<500&&response.status!==429)break;}
+    if (!response) return Response.json(fallback);
     if (!response.ok) return Response.json(fallback);
     const payload = await response.json() as { choices?:Array<{ message?:{ content?:string } }>; evaluation?:Partial<Evaluation> };
     const raw = payload.choices?.[0]?.message?.content;
     const parsed = raw ? JSON.parse(raw) as Partial<Evaluation> : payload.evaluation;
-    return Response.json(cleanEvaluation(parsed || {}, fallback));
+    if(chatUser)await recordUsage(chatUser.userId,Math.ceil((input.answer.length+input.reference.length)/2));
+    return Response.json({ ...cleanEvaluation(parsed || {}, fallback),model });
   } catch { return Response.json(fallback); }
 }

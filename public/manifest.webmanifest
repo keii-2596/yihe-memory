@@ -1,0 +1,10 @@
+{
+  "name":"忆核 — AI 知识记忆训练",
+  "short_name":"忆核",
+  "description":"用间隔重复、语音回答和 AI 评估练习计算机面试知识。",
+  "start_url":"/",
+  "display":"standalone",
+  "background_color":"#f5f4ef",
+  "theme_color":"#1f211e",
+  "icons":[{"src":"/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}
