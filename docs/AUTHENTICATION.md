@@ -10,7 +10,7 @@
 
 ### 2. ChatGPT / OpenAI Sites
 
-Sites 会提供经过验证的 `oai-authenticated-user-*` 请求头。保持 `AUTH_MODE=auto` 和 `AUTH_ENABLE_CHATGPT=true` 即可显示登录入口并启用 D1 云同步。
+Sites 会提供经过验证的 `oai-authenticated-user-*` 请求头。设置 `AUTH_MODE=auto`、`AUTH_ENABLE_CHATGPT=true` 和 `AUTH_TRUST_CHATGPT_HEADERS=true`，即可显示登录入口并启用 D1 云同步。普通自托管环境必须保持后一个开关为 `false`，避免信任客户端自行构造的同名请求头。
 
 ### 3. 通用反向代理与 SSO
 

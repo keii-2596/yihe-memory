@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { safeAuthUrl, safeEqual } from './auth-policy.ts';
 import { DEFAULT_QUESTIONS, dueQuestions, mergeBuiltInQuestions, parseImportedCards, reviewStreak, scheduleReview } from './model.ts';
 
 const now = new Date('2026-08-26T08:00:00.000Z');
@@ -59,4 +60,19 @@ test('bank migration preserves custom cards and existing edits without duplicate
   assert.equal(merged.filter(item=>item.id===edited.id).length,1);
   assert.equal(merged.find(item=>item.id==='custom-1')?.title,'我的自定义题');
   assert.equal(merged.length,DEFAULT_QUESTIONS.length+1);
+});
+
+test('auth redirects accept safe destinations and reject ambiguous URLs', () => {
+  assert.equal(safeAuthUrl('/auth/github?return_to=%2F'),'/auth/github?return_to=%2F');
+  assert.equal(safeAuthUrl('https://accounts.example.com/sign-in'),'https://accounts.example.com/sign-in');
+  assert.equal(safeAuthUrl('//evil.example/sign-in'),undefined);
+  assert.equal(safeAuthUrl('/\\evil.example'),undefined);
+  assert.equal(safeAuthUrl('http://accounts.example.com/sign-in'),undefined);
+  assert.equal(safeAuthUrl('https://user:secret@accounts.example.com/sign-in'),undefined);
+});
+
+test('proxy secret comparison requires exact content and length', () => {
+  assert.equal(safeEqual('same-secret','same-secret'),true);
+  assert.equal(safeEqual('same-secret','other-value'),false);
+  assert.equal(safeEqual('short','shorter'),false);
 });

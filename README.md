@@ -55,6 +55,8 @@ pnpm verify
 
 详细安全边界与环境变量见 [认证接入文档](docs/AUTHENTICATION.md)。仅填写 GitHub/Google 登录 URL 不会自动完成 OAuth；身份仍必须由可信服务验证后传给应用。
 
+所有身份头默认不受信任。Sites 部署需要显式开启 `AUTH_TRUST_CHATGPT_HEADERS`；其他部署只应开启自己已用网关保护的身份方式。
+
 ## 题库与贡献
 
 题库结构、分类和升级规则见 [Java 题库说明](docs/QUESTION_BANK.md)。欢迎按 [贡献指南](CONTRIBUTING.md) 补题、纠错和改进功能。安全问题请遵循 [安全策略](SECURITY.md) 私密报告。
