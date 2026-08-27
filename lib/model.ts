@@ -51,26 +51,38 @@ export type ReviewRecord = {
   model?: string;
   durationSeconds?: number;
   fillerCount?: number;
+  hintUsed?: boolean;
+  referenceViewed?: boolean;
 };
 
 export type Settings = {
-  dailyGoal:number; targetRetention:number; reminderTime:string; notifications:boolean;
+  dailyGoal:number; dailyNewLimit:number; targetRetention:number; reminderTime:string; notifications:boolean;
   model:string; dailyAiLimit:number; selectedRoute:string; compactMobile:boolean;
 };
 
 export type InterviewReport = { id:string; role:string; questionIds:string[]; scores:number[]; startedAt:string; completedAt:string; durationSeconds:number };
-export type AppSnapshot = { version:3; questions:Question[]; progress:Progress; history:ReviewRecord[]; settings:Settings; interviewReports:InterviewReport[] };
-export const DEFAULT_SETTINGS:Settings={ dailyGoal:12,targetRetention:.9,reminderTime:'20:00',notifications:false,model:'gpt-4.1-mini',dailyAiLimit:30,selectedRoute:'all',compactMobile:false };
+export type AppSnapshot = { version:4; questions:Question[]; progress:Progress; history:ReviewRecord[]; settings:Settings; interviewReports:InterviewReport[] };
+export const DEFAULT_SETTINGS:Settings={ dailyGoal:20,dailyNewLimit:5,targetRetention:.9,reminderTime:'20:00',notifications:false,model:'gpt-4.1-mini',dailyAiLimit:30,selectedRoute:'java-backend',compactMobile:false };
+const JAVA_BACKEND_CATEGORIES=['Java 基础','面向对象','集合框架','Java IO','Java 新特性','JVM','Java 并发','Spring','Spring Boot','MyBatis','数据库','Redis','消息队列','分布式','系统设计'];
 export const LEARNING_ROUTES=[
-  { id:'all',name:'Java 全栈八股',description:'从语言基础到分布式与系统设计的完整题库',categories:[] as string[] },
-  { id:'java-backend',name:'Java 后端 30 天',description:'完整 Java 后端面试路线',categories:[] as string[] },
+  { id:'java-backend',name:'Java 后端循序路线',description:'按基础、JVM、框架、数据与分布式逐步引入新知识',categories:JAVA_BACKEND_CATEGORIES },
   { id:'java-core',name:'Java 核心基础',description:'语言、面向对象、集合、IO 与新特性',categories:['Java 基础','面向对象','集合框架','Java IO','Java 新特性'] },
   { id:'jvm-concurrency',name:'JVM 与并发',description:'内存、GC、类加载、锁和线程池',categories:['JVM','Java 并发'] },
   { id:'spring-data',name:'Spring 与数据层',description:'Spring、Boot、MyBatis、MySQL 与 Redis',categories:['Spring','Spring Boot','MyBatis','数据库','Redis'] },
   { id:'distributed',name:'分布式进阶',description:'消息、微服务、分布式事务与场景设计',categories:['消息队列','分布式','系统设计'] },
-  { id:'frontend',name:'前端工程师',description:'前端、网络、浏览器与算法基础',categories:['前端','计算机网络','算法'] },
-  { id:'infra',name:'基础架构',description:'操作系统、网络、中间件与分布式系统',categories:['操作系统','计算机网络','中间件','系统设计'] },
+  { id:'all',name:'全部题库',description:'包含自定义题与所有分类，不限制新知识范围',categories:[] as string[] },
 ];
+export type LearningRoute=(typeof LEARNING_ROUTES)[number];
+
+export type DailyQueue = {
+  questions:Question[];
+  reviewScheduled:number;
+  newScheduled:number;
+  reviewCompleted:number;
+  newCompleted:number;
+  reviewBacklog:number;
+  newAvailable:number;
+};
 
 export const DEFAULT_QUESTIONS:Question[]=JAVA_QUESTION_BANK;
 
@@ -118,8 +130,47 @@ export function dueQuestions(questions: Question[], progress: Progress, now = ne
     const bDate = progress[b.id]?.nextReview ?? '';
     if (!aDate && bDate) return -1;
     if (aDate && !bDate) return 1;
-    return aDate.localeCompare(bDate) || (progress[a.id]?.strength ?? a.strength) - (progress[b.id]?.strength ?? b.strength);
+    const urgent=(item:QuestionProgress|undefined)=>item?.state==='relearning'?0:item?.state==='learning'?1:2;
+    return urgent(progress[a.id])-urgent(progress[b.id])||aDate.localeCompare(bDate)||(estimatedRecall(progress[a.id],now)??100)-(estimatedRecall(progress[b.id],now)??100)||(progress[b.id]?.lapses??0)-(progress[a.id]?.lapses??0);
   });
+}
+
+export function questionsForRoute(questions:Question[],route:LearningRoute) {
+  const scoped=route.categories.length?questions.filter(question=>route.categories.includes(question.category)||(question.routeIds||[]).includes(route.id)):questions;
+  if(!route.categories.length)return scoped;
+  const categoryOrder=new Map(route.categories.map((category,index)=>[category,index]));
+  return scoped.map((question,index)=>({question,index})).sort((a,b)=>(categoryOrder.get(a.question.category)??999)-(categoryOrder.get(b.question.category)??999)||a.question.difficulty-b.question.difficulty||a.index-b.index).map(item=>item.question);
+}
+
+export function buildDailyQueue(questions:Question[],progress:Progress,history:ReviewRecord[],settings:Settings,route:LearningRoute,now=new Date()):DailyQueue {
+  const today=localDateKey(now);
+  const firstReview=new Map<string,ReviewRecord>();
+  for(const record of history){const current=firstReview.get(record.questionId);if(!current||record.reviewedAt<current.reviewedAt)firstReview.set(record.questionId,record);}
+  const todayRecords=history.filter(record=>localDateKey(new Date(record.reviewedAt))===today);
+  const newCompleted=todayRecords.filter(record=>firstReview.get(record.questionId)?.id===record.id).length;
+  const reviewCompleted=Math.max(0,todayRecords.length-newCompleted);
+  const dueReviews=dueQuestions(questions.filter(question=>progress[question.id]),progress,now);
+  const remainingReviewLimit=Math.max(0,settings.dailyGoal-reviewCompleted);
+  const reviews=dueReviews.slice(0,remainingReviewLimit);
+  const reviewBacklog=Math.max(0,dueReviews.length-reviews.length);
+  const routeQuestions=questionsForRoute(questions,route);
+  const newQuestions=routeQuestions.filter(question=>!progress[question.id]);
+  const remainingNewLimit=reviewBacklog?0:Math.max(0,settings.dailyNewLimit-newCompleted);
+  const newCards=newQuestions.slice(0,remainingNewLimit);
+  return {questions:[...reviews,...newCards],reviewScheduled:reviews.length,newScheduled:newCards.length,reviewCompleted,newCompleted,reviewBacklog,newAvailable:newQuestions.length};
+}
+
+export function estimatedRecall(item:QuestionProgress|undefined,now=new Date()):number|null {
+  if(!item)return null;
+  const stability=Math.max(.2,item.stability??item.interval??1);
+  const fallbackLast=new Date(new Date(item.nextReview).getTime()-Math.max(0,item.interval)*86400000);
+  const last=item.lastReviewedAt?new Date(item.lastReviewedAt):fallbackLast;
+  const elapsed=Math.max(0,(now.getTime()-last.getTime())/86400000);
+  return Math.max(1,Math.min(100,Math.round(Math.exp(Math.log(.9)*elapsed/stability)*100)));
+}
+
+export function isMastered(item:QuestionProgress|undefined) {
+  return Boolean(item&&item.state==='review'&&(item.stability??item.interval)>=21&&item.lastScore>=70);
 }
 
 export function reviewStreak(history: ReviewRecord[], now = new Date()) {
@@ -154,7 +205,7 @@ export function normalizeQuestion(question:Question):Question {
 }
 
 export function createSnapshot(questions:Question[],progress:Progress,history:ReviewRecord[],settings:Settings,interviewReports:InterviewReport[]):AppSnapshot {
-  return {version:3,questions:questions.map(normalizeQuestion),progress,history,settings:{...DEFAULT_SETTINGS,...settings},interviewReports};
+  return {version:4,questions:questions.map(normalizeQuestion),progress,history,settings:{...DEFAULT_SETTINGS,...settings},interviewReports};
 }
 
 export function mergeBuiltInQuestions(questions:Question[]) {

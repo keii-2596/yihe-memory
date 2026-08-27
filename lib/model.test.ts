@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { safeAuthUrl, safeEqual } from './auth-policy.ts';
-import { DEFAULT_QUESTIONS, dueQuestions, mergeBuiltInQuestions, parseImportedCards, reviewStreak, scheduleReview } from './model.ts';
+import { DEFAULT_QUESTIONS, DEFAULT_SETTINGS, LEARNING_ROUTES, buildDailyQueue, dueQuestions, estimatedRecall, mergeBuiltInQuestions, parseImportedCards, questionsForRoute, reviewStreak, scheduleReview } from './model.ts';
 
 const now = new Date('2026-08-26T08:00:00.000Z');
 const question = DEFAULT_QUESTIONS[0];
@@ -30,6 +30,33 @@ test('higher target retention schedules an earlier review', () => {
   const high=scheduleReview(question,first,'good',85,later,.95);
   const normal=scheduleReview(question,first,'good',85,later,.85);
   assert.ok(high.interval<normal.interval);
+});
+
+test('daily queue limits new knowledge instead of exhausting the full bank', () => {
+  const settings={...DEFAULT_SETTINGS,dailyGoal:20,dailyNewLimit:3};
+  const route=LEARNING_ROUTES.find(item=>item.id==='java-backend')!;
+  const queue=buildDailyQueue(DEFAULT_QUESTIONS,{},[],settings,route,now);
+  assert.equal(queue.newScheduled,3);
+  assert.equal(queue.reviewScheduled,0);
+  assert.equal(queue.questions.length,3);
+});
+
+test('overdue reviews are prioritized and pause new knowledge when backlog remains', () => {
+  const due=DEFAULT_QUESTIONS.slice(0,2);
+  const progress=Object.fromEntries(due.map(item=>[item.id,{...scheduleReview(item,undefined,'good',80,new Date('2026-08-20T08:00:00.000Z')),nextReview:'2026-08-21T08:00:00.000Z'}]));
+  const settings={...DEFAULT_SETTINGS,dailyGoal:1,dailyNewLimit:5};
+  const queue=buildDailyQueue(DEFAULT_QUESTIONS,progress,[],settings,LEARNING_ROUTES[0],now);
+  assert.equal(queue.reviewScheduled,1);
+  assert.equal(queue.reviewBacklog,1);
+  assert.equal(queue.newScheduled,0);
+});
+
+test('routes order new knowledge and recall is derived from personal timing data', () => {
+  const route=LEARNING_ROUTES.find(item=>item.id==='jvm-concurrency')!;
+  assert.ok(questionsForRoute(DEFAULT_QUESTIONS,route).every(item=>['JVM','Java 并发'].includes(item.category)));
+  const item=scheduleReview(question,undefined,'good',80,now);
+  assert.equal(estimatedRecall(item,new Date('2026-08-29T08:00:00.000Z')),90);
+  assert.equal(estimatedRecall(undefined,now),null);
 });
 
 test('CSV and Markdown can be imported as cards', () => {
