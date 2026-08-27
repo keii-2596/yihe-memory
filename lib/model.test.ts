@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_QUESTIONS, dueQuestions, parseImportedCards, reviewStreak, scheduleReview } from './model.ts';
+import { DEFAULT_QUESTIONS, dueQuestions, mergeBuiltInQuestions, parseImportedCards, reviewStreak, scheduleReview } from './model.ts';
 
 const now = new Date('2026-08-26T08:00:00.000Z');
 const question = DEFAULT_QUESTIONS[0];
@@ -36,4 +36,27 @@ test('CSV and Markdown can be imported as cards', () => {
   const markdown=parseImportedCards('# TCP 三次握手\n- 确认双方收发能力\n- 同步序列号','cards.md');
   assert.equal(csv.length,1); assert.deepEqual(csv[0].keyPoints,['加速查询','空间换时间']);
   assert.equal(markdown.length,1); assert.equal(markdown[0].keyPoints.length,2);
+});
+
+test('built-in Java bank is complete and structurally valid', () => {
+  assert.ok(DEFAULT_QUESTIONS.length>=160);
+  assert.equal(new Set(DEFAULT_QUESTIONS.map(item=>item.id)).size,DEFAULT_QUESTIONS.length);
+  assert.equal(new Set(DEFAULT_QUESTIONS.map(item=>item.title)).size,DEFAULT_QUESTIONS.length);
+  for(const item of DEFAULT_QUESTIONS){
+    assert.ok(item.category); assert.ok(item.title); assert.ok(item.reference);
+    assert.ok(item.keyPoints.length>=3,`${item.id} needs at least 3 key points`);
+    assert.ok([1,2,3].includes(item.difficulty));
+  }
+  const categories=new Set(DEFAULT_QUESTIONS.map(item=>item.category));
+  for(const required of ['Java 基础','集合框架','JVM','Java 并发','Spring','数据库','Redis','分布式']) assert.ok(categories.has(required));
+});
+
+test('bank migration preserves custom cards and existing edits without duplicates', () => {
+  const edited={...DEFAULT_QUESTIONS[0],title:'用户改过的题目'};
+  const custom={...DEFAULT_QUESTIONS[1],id:'custom-1',title:'我的自定义题'};
+  const merged=mergeBuiltInQuestions([edited,custom]);
+  assert.equal(merged.find(item=>item.id===edited.id)?.title,'用户改过的题目');
+  assert.equal(merged.filter(item=>item.id===edited.id).length,1);
+  assert.equal(merged.find(item=>item.id==='custom-1')?.title,'我的自定义题');
+  assert.equal(merged.length,DEFAULT_QUESTIONS.length+1);
 });

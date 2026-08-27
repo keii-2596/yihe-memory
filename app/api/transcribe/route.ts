@@ -1,10 +1,10 @@
 import { getFiles } from '../../../db';
-import { getChatGPTUser } from '../../chatgpt-auth';
+import { getAppUser } from '../../chatgpt-auth';
 
 export async function POST(request:Request) {
   const form=await request.formData(); const audio=form.get('audio');
   if (!(audio instanceof File) || audio.size===0 || audio.size>15_000_000) return Response.json({error:'invalid_audio'},{status:400});
-  const user=await getChatGPTUser(); const objectKey=`voice/${user?.userId||'guest'}/${crypto.randomUUID()}.webm`;
+  const user=await getAppUser(); const objectKey=`voice/${user?.userId||'guest'}/${crypto.randomUUID()}.webm`;
   try { await getFiles().put(objectKey,await audio.arrayBuffer(),{httpMetadata:{contentType:audio.type||'audio/webm'}}); } catch { /* local development can continue without R2 */ }
   const endpoint=process.env.AI_TRANSCRIPTION_ENDPOINT; const apiKey=process.env.AI_EVALUATION_API_KEY;
   if (!endpoint||!apiKey) return Response.json({error:'transcription_not_configured',objectKey},{status:501});

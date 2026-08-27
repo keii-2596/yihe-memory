@@ -1,35 +1,68 @@
-# 忆核
+# 忆核（Yihe Memory）
 
-面向计算机面试知识的 AI 间隔重复学习应用。用户用文字或录音回答开放题，系统从概念覆盖、逻辑准确和表达清晰三个维度评估，并按目标记忆率安排下一次复习。
+面向 Java 面试知识的开源 AI 间隔重复学习应用。用户用文字或语音回答开放题，系统按概念覆盖、准确性与表达质量给出反馈，再根据 FSRS 风格调度安排复习。
 
-## 已包含
+## 核心能力
 
-- 12 道计算机面试示例题，覆盖数据库、网络、操作系统、Java、算法、前端和系统设计
-- 题库 CRUD、标签、收藏、学习路线、前置知识和弱项知识图谱
-- JSON / CSV / Markdown 批量导入、AI 从长文自动制卡、知识包分享
-- 文字、浏览器语音和服务端录音转写，记录时长与口头填充词
-- AI 判题、模型切换、失败重试、每日额度、本地评分回退和面试官追问
-- FSRS 风格调度、目标记忆率、每日目标、补卡、浏览器提醒和日历订阅
-- 完整回答历史、同题多次对比、遗漏趋势与薄弱原因诊断
-- 随机模拟面试、能力报告、活动统计和分类掌握度
-- ChatGPT 私有身份云同步、每日自动备份、本机离线缓存和冲突合并
-- 可安装 PWA、移动卡片布局、键盘操作、焦点样式和减少动效支持
+- 163 道内置 Java 八股卡片，覆盖语言基础、集合、JVM、并发、Spring、数据库、Redis、消息队列、分布式与系统设计
+- Java 全栈、核心基础、JVM 与并发、Spring 与数据层、分布式等学习路线
+- AI 判题、参考答案自查、追问、本地评分回退与每日调用额度
+- 文字回答、浏览器语音识别与服务端录音转写
+- 间隔重复、目标记忆率、每日任务、提醒、日历订阅与模拟面试
+- 回答历史、同题对比、掌握度统计与反复遗漏诊断
+- JSON / CSV / Markdown 导入、AI 从材料制卡、知识包分享
+- 匿名本机模式，以及可选 ChatGPT、GitHub、Google、邮箱、Cloudflare Access 和自托管 SSO 接入
+- D1 账号隔离同步、R2 录音暂存、离线缓存和每日版本备份
+- PWA、移动端布局、键盘操作与无障碍焦点样式
 
-## AI 接口
+## 快速开始
 
-复制 `.env.example` 为 `.env.local` 并配置服务端环境变量。接口默认兼容 OpenAI Chat Completions：
+需要 Node.js 22 和 pnpm 10：
+
+```bash
+pnpm install
+cp .env.example .env.local
+pnpm dev
+```
+
+未配置 AI 密钥时应用仍可完整运行，并使用本地评分算法。提交改动前运行：
+
+```bash
+pnpm verify
+```
+
+## AI 配置
+
+服务端接口默认兼容 OpenAI Chat Completions：
 
 - `AI_EVALUATION_ENDPOINT`
 - `AI_EVALUATION_API_KEY`
 - `AI_EVALUATION_MODEL`
 - `AI_TRANSCRIPTION_ENDPOINT`
 - `AI_TRANSCRIPTION_MODEL`
-- `NEXT_PUBLIC_SITE_ORIGIN`（部署后的可信站点地址，用于分享卡片）
+- `NEXT_PUBLIC_SITE_ORIGIN`
 
-浏览器只请求站内的 `POST /api/evaluate`，不会接触 API 密钥。如果没有配置外部模型，接口会自动使用本地核心概念覆盖算法，便于直接运行和演示。
+浏览器只请求站内 API，不接触模型密钥。`GET /api/evaluate` 也不会返回任何密钥。
 
-`GET /api/evaluate` 只返回当前评估模式与模型名称，不返回任何密钥。
+## 账号方案
 
-## 数据说明
+默认无需注册，学习数据只在本机保存。开源部署者可以选择：
 
-私有部署会使用 ChatGPT 已登录身份隔离数据，并通过 D1 保存学习快照、通过 R2 暂存录音。每次修改也会先写入浏览器离线缓存；服务端每天自动保留一次旧版本，最多 20 个备份点。设置页仍可导出完整 JSON 备份。
+- OpenAI Sites 的 ChatGPT 身份；
+- oauth2-proxy、Authelia、Authentik 或企业网关提供的可信身份头；
+- Cloudflare Access；
+- Auth.js、Supabase、Clerk 等承载的 GitHub、Google 或邮箱登录页。
+
+详细安全边界与环境变量见 [认证接入文档](docs/AUTHENTICATION.md)。仅填写 GitHub/Google 登录 URL 不会自动完成 OAuth；身份仍必须由可信服务验证后传给应用。
+
+## 题库与贡献
+
+题库结构、分类和升级规则见 [Java 题库说明](docs/QUESTION_BANK.md)。欢迎按 [贡献指南](CONTRIBUTING.md) 补题、纠错和改进功能。安全问题请遵循 [安全策略](SECURITY.md) 私密报告。
+
+## 部署与存储
+
+项目使用 Next.js/Vinext，可部署到 OpenAI Sites 或兼容 Cloudflare Workers 的环境。持久化云同步需要 D1，录音暂存需要 R2；不绑定云存储时仍可作为本地优先应用使用。
+
+## 开源许可
+
+[MIT](LICENSE) © 2026 keii-2596

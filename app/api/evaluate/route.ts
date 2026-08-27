@@ -1,5 +1,5 @@
 import { ensureSchema, getDb } from '../../../db';
-import { getChatGPTUser } from '../../chatgpt-auth';
+import { getAppUser } from '../../chatgpt-auth';
 
 type EvaluationRequest = {
   question: string;
@@ -78,7 +78,7 @@ async function recordUsage(ownerId:string,tokens:number) {
 }
 
 export async function GET() {
-  const user=await getChatGPTUser(); const usage=user?await usageFor(user.userId):0;
+  const user=await getAppUser(); const usage=user?await usageFor(user.userId):0;
   return Response.json({
     mode:process.env.AI_EVALUATION_ENDPOINT && process.env.AI_EVALUATION_API_KEY ? 'ai' : 'local',
     model:process.env.AI_EVALUATION_MODEL || null,
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
   const endpoint = process.env.AI_EVALUATION_ENDPOINT;
   const apiKey = process.env.AI_EVALUATION_API_KEY;
   if (!endpoint || !apiKey) return Response.json(fallback);
-  const chatUser=await getChatGPTUser(); const dailyLimit=Math.max(5,Math.min(100,Number(input.dailyLimit)||30));
+  const chatUser=await getAppUser(); const dailyLimit=Math.max(5,Math.min(100,Number(input.dailyLimit)||30));
   if (chatUser && await usageFor(chatUser.userId)>=dailyLimit) return Response.json({ ...fallback, summary:`今日 AI 判题额度已用完（${dailyLimit} 次），本次使用本地评估。${fallback.summary}` });
 
   const system = `你是一名严格但鼓励式的计算机面试教练。评价答案时关注概念覆盖、逻辑准确和表达清晰，不要求逐字匹配参考答案。只输出 JSON，不要 markdown。字段必须为：score(0-100数字)、verdict(短句)、summary(1-2句)、hitPoints(字符串数组)、missedPoints(字符串数组)、suggestion(一句可执行建议)。`;
