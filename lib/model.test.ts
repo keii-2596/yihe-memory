@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { safeAuthUrl, safeEqual } from './auth-policy.ts';
-import { DEFAULT_QUESTIONS, DEFAULT_SETTINGS, LEARNING_ROUTES, buildDailyQueue, dueQuestions, estimatedRecall, mergeBuiltInQuestions, parseImportedCards, questionsForRoute, reviewStreak, scheduleReview } from './model.ts';
+import { DEFAULT_QUESTIONS, DEFAULT_RETENTION, DEFAULT_SETTINGS, LEARNING_ROUTES, adaptiveDailyLimits, buildDailyQueue, buildWeeklyReport, consumeStreakFreeze, createSnapshot, dueQuestions, estimateCompletion, estimatedRecall, learningCalendar, mergeBuiltInQuestions, parseImportedCards, questionsForRoute, reviewStreak, scheduleReview } from './model.ts';
 
 const now = new Date('2026-08-26T08:00:00.000Z');
 const question = DEFAULT_QUESTIONS[0];
@@ -87,6 +87,39 @@ test('bank migration preserves custom cards and existing edits without duplicate
   assert.equal(merged.filter(item=>item.id===edited.id).length,1);
   assert.equal(merged.find(item=>item.id==='custom-1')?.title,'我的自定义题');
   assert.equal(merged.length,DEFAULT_QUESTIONS.length+1);
+});
+
+test('career bank covers six roles plus junior, mid and senior routes', () => {
+  for(const routeId of ['java-backend','frontend','go-backend','python-backend','qa','devops']){
+    const route=LEARNING_ROUTES.find(item=>item.id===routeId)!;
+    assert.ok(questionsForRoute(DEFAULT_QUESTIONS,route).length>=10,`${routeId} needs a usable starter bank`);
+  }
+  for(const routeId of ['junior-foundation','mid-engineering','senior-architecture']){
+    const route=LEARNING_ROUTES.find(item=>item.id===routeId)!;
+    assert.ok(questionsForRoute(DEFAULT_QUESTIONS,route).length>0);
+  }
+});
+
+test('snapshot v5 preserves custom routes, retention and upgraded question metadata', () => {
+  const customRoute={id:'jd-test',name:'JD 测试',description:'岗位路线',categories:[],questionIds:[question.id],source:'jd' as const};
+  const snapshot=createSnapshot([question],{},[],DEFAULT_SETTINGS,[],[customRoute],{streakFreezes:0,freezeDates:['2026-08-25']});
+  assert.equal(snapshot.version,5);assert.equal(snapshot.customRoutes[0].id,'jd-test');assert.deepEqual(snapshot.retention.freezeDates,['2026-08-25']);assert.ok(snapshot.questions[0].levels?.length);
+});
+
+test('retention helpers create reports, calendars, estimates and safe streak freezes', () => {
+  const records=['2026-08-22','2026-08-24','2026-08-26'].map((date,index)=>({id:`r${index}`,questionId:DEFAULT_QUESTIONS[index].id,category:DEFAULT_QUESTIONS[index].category,score:70+index*10,rating:'good' as const,reviewedAt:`${date}T08:00:00.000Z`,durationSeconds:120}));
+  const report=buildWeeklyReport(records,DEFAULT_QUESTIONS,now);assert.equal(report.activeDays,3);assert.equal(report.reviews,3);assert.equal(report.minutes,6);
+  const calendar=learningCalendar(records,{},7,now);assert.equal(calendar.length,7);assert.equal(calendar.at(-1)?.completed,1);
+  const completion=estimateCompletion(DEFAULT_QUESTIONS,{},LEARNING_ROUTES.find(item=>item.id==='frontend')!,{...DEFAULT_SETTINGS,dailyNewLimit:5},now);assert.equal(completion.days,2);
+  const frozen=consumeStreakFreeze(DEFAULT_RETENTION,records,new Date('2026-08-28T08:00:00.000Z'));assert.equal(frozen?.streakFreezes,0);assert.deepEqual(frozen?.freezeDates,['2026-08-27']);
+  assert.equal(reviewStreak(records,new Date('2026-08-28T08:00:00.000Z'),['2026-08-27']),2);
+});
+
+test('adaptive daily limits reduce overload and reward stable completion', () => {
+  const weak=Array.from({length:3},(_,index)=>({id:`w${index}`,questionId:question.id,category:question.category,score:45,rating:'hard' as const,reviewedAt:`2026-08-${24+index}T08:00:00.000Z`}));
+  const reduced=adaptiveDailyLimits(weak,{...DEFAULT_SETTINGS,dailyNewLimit:10,dailyGoal:30},now);assert.ok(reduced.newLimit<10);assert.ok(reduced.reviewLimit<30);
+  const strong=Array.from({length:6},(_,index)=>({id:`s${index}`,questionId:question.id,category:question.category,score:90,rating:'easy' as const,reviewedAt:`2026-08-${21+index}T08:00:00.000Z`}));
+  const increased=adaptiveDailyLimits(strong,{...DEFAULT_SETTINGS,dailyNewLimit:5,dailyGoal:20},now);assert.equal(increased.newLimit,6);assert.equal(increased.reviewLimit,25);
 });
 
 test('auth redirects accept safe destinations and reject ambiguous URLs', () => {

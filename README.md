@@ -10,6 +10,10 @@
 - 文字回答、浏览器语音识别与服务端录音转写
 - 分级提示、按需查看答案、间隔重复与个人预计记住率
 - 每日新学/复习独立上限、复习积压保护、提醒与日历订阅
+- Java、前端、Go、Python、测试、SRE 六类岗位题库，以及初级/中级/高级和公司方向路线
+- 粘贴 JD 生成个人路线；从 Markdown、CSV、JSON、公开网页和 PDF 生成记忆卡
+- 动态任务量、学习周报、六周日历、完成预测、隐私分享和连续学习补签卡
+- 浏览器、邮箱和企业微信群提醒（邮箱/群提醒需要部署者配置发送服务）
 - 回答历史、同题对比、掌握度统计与反复遗漏诊断
 - JSON / CSV / Markdown 导入、AI 从材料制卡、知识包分享
 - 匿名本机模式，以及可选 ChatGPT、GitHub、Google、邮箱、Cloudflare Access 和自托管 SSO 接入
@@ -68,6 +72,8 @@ pnpm verify
 ## 部署与存储
 
 项目使用 Next.js/Vinext，可部署到 OpenAI Sites 或兼容 Cloudflare Workers 的环境。持久化云同步需要 D1，录音暂存需要 R2；不绑定云存储时仍可作为本地优先应用使用。
+
+留存与多渠道提醒的部署方式见 [留存与提醒文档](docs/RETENTION_AND_REMINDERS.md)。可安装 Android 客户端工程位于 [`android/`](android/README.md)，采用 Android 官方推荐的 Trusted Web Activity，与网页共用登录和云数据。
 
 ## 开源许可
 

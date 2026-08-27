@@ -1,6 +1,8 @@
 import { JAVA_QUESTION_BANK } from '../data/java-bank.ts';
+import { CAREER_QUESTION_BANK } from '../data/career-bank.ts';
 
 export type Rating = 'again' | 'hard' | 'good' | 'easy';
+export type CareerLevel = 'junior' | 'mid' | 'senior';
 
 export type Question = {
   id: string;
@@ -14,7 +16,12 @@ export type Question = {
   tags?: string[];
   favorite?: boolean;
   routeIds?: string[];
+  roleIds?: string[];
+  levels?: CareerLevel[];
+  companyTags?: string[];
+  directionTags?: string[];
   prerequisites?: string[];
+  bankVersion?: number;
   source?: string;
 };
 
@@ -57,22 +64,35 @@ export type ReviewRecord = {
 
 export type Settings = {
   dailyGoal:number; dailyNewLimit:number; targetRetention:number; reminderTime:string; notifications:boolean;
-  model:string; dailyAiLimit:number; selectedRoute:string; compactMobile:boolean;
+  model:string; dailyAiLimit:number; selectedRoute:string; compactMobile:boolean; adaptiveDailyGoal:boolean; weeklyGoal:number; targetDate:string;
 };
 
 export type InterviewReport = { id:string; role:string; questionIds:string[]; scores:number[]; startedAt:string; completedAt:string; durationSeconds:number };
-export type AppSnapshot = { version:4; questions:Question[]; progress:Progress; history:ReviewRecord[]; settings:Settings; interviewReports:InterviewReport[] };
-export const DEFAULT_SETTINGS:Settings={ dailyGoal:20,dailyNewLimit:5,targetRetention:.9,reminderTime:'20:00',notifications:false,model:'gpt-4.1-mini',dailyAiLimit:30,selectedRoute:'java-backend',compactMobile:false };
+export type RetentionState={ streakFreezes:number; freezeDates:string[]; lastWeeklyReportAt?:string };
+export type LearningRoute={id:string;name:string;description:string;categories:string[];roleIds?:string[];levels?:CareerLevel[];companyTags?:string[];directionTags?:string[];questionIds?:string[];source?:'built-in'|'jd'};
+export type AppSnapshot = { version:5; questions:Question[]; progress:Progress; history:ReviewRecord[]; settings:Settings; interviewReports:InterviewReport[]; customRoutes:LearningRoute[]; retention:RetentionState };
+export const DEFAULT_RETENTION:RetentionState={streakFreezes:1,freezeDates:[]};
+export const DEFAULT_SETTINGS:Settings={ dailyGoal:20,dailyNewLimit:5,targetRetention:.9,reminderTime:'20:00',notifications:false,model:'gpt-4.1-mini',dailyAiLimit:30,selectedRoute:'java-backend',compactMobile:false,adaptiveDailyGoal:true,weeklyGoal:5,targetDate:'' };
 const JAVA_BACKEND_CATEGORIES=['Java 基础','面向对象','集合框架','Java IO','Java 新特性','JVM','Java 并发','Spring','Spring Boot','MyBatis','数据库','Redis','消息队列','分布式','系统设计'];
-export const LEARNING_ROUTES=[
+export const LEARNING_ROUTES:LearningRoute[]=[
   { id:'java-backend',name:'Java 后端循序路线',description:'按基础、JVM、框架、数据与分布式逐步引入新知识',categories:JAVA_BACKEND_CATEGORIES },
   { id:'java-core',name:'Java 核心基础',description:'语言、面向对象、集合、IO 与新特性',categories:['Java 基础','面向对象','集合框架','Java IO','Java 新特性'] },
   { id:'jvm-concurrency',name:'JVM 与并发',description:'内存、GC、类加载、锁和线程池',categories:['JVM','Java 并发'] },
   { id:'spring-data',name:'Spring 与数据层',description:'Spring、Boot、MyBatis、MySQL 与 Redis',categories:['Spring','Spring Boot','MyBatis','数据库','Redis'] },
   { id:'distributed',name:'分布式进阶',description:'消息、微服务、分布式事务与场景设计',categories:['消息队列','分布式','系统设计'] },
-  { id:'all',name:'全部题库',description:'包含自定义题与所有分类，不限制新知识范围',categories:[] as string[] },
+  { id:'frontend',name:'前端工程师',description:'JavaScript、TypeScript、React、浏览器、工程化与性能',categories:[],roleIds:['frontend'] },
+  { id:'go-backend',name:'Go 后端工程师',description:'Go 语言、并发、Runtime、服务治理与性能',categories:[],roleIds:['go-backend'] },
+  { id:'python-backend',name:'Python 后端工程师',description:'Python 基础、运行时、异步、Web 与工程实践',categories:[],roleIds:['python-backend'] },
+  { id:'qa',name:'测试与质量工程师',description:'测试设计、自动化、性能、CI 质量与混沌工程',categories:[],roleIds:['qa'] },
+  { id:'devops',name:'运维与 SRE',description:'Linux、容器、Kubernetes、CI/CD、可观测性与安全',categories:[],roleIds:['devops'] },
+  { id:'junior-foundation',name:'初级 · 基础通关',description:'覆盖各岗位初级面试的核心概念',categories:[],levels:['junior'] },
+  { id:'mid-engineering',name:'中级 · 工程能力',description:'聚焦并发、工程化、故障定位与项目实践',categories:[],levels:['mid'] },
+  { id:'senior-architecture',name:'高级 · 架构与治理',description:'聚焦系统设计、性能、安全与可靠性',categories:[],levels:['senior'] },
+  { id:'company-big-tech',name:'大厂通用方向',description:'算法之外的系统设计、性能、并发与工程深度',categories:['JVM','Java 并发','分布式','系统设计'],companyTags:['大厂通用'] },
+  { id:'company-finance',name:'金融高可用方向',description:'事务一致性、消息可靠性、安全、SRE 与容灾',categories:['数据库','Redis','消息队列','分布式'],companyTags:['金融高可用'] },
+  { id:'company-startup',name:'创业团队全栈方向',description:'覆盖快速交付所需的前后端、数据与交付能力',categories:['Spring Boot','数据库','系统设计'],companyTags:['创业全栈'] },
+  { id:'all',name:'全部题库',description:'包含自定义题与所有分类，不限制新知识范围',categories:[] },
 ];
-export type LearningRoute=(typeof LEARNING_ROUTES)[number];
 
 export type DailyQueue = {
   questions:Question[];
@@ -84,7 +104,7 @@ export type DailyQueue = {
   newAvailable:number;
 };
 
-export const DEFAULT_QUESTIONS:Question[]=JAVA_QUESTION_BANK;
+export const DEFAULT_QUESTIONS:Question[]=[...JAVA_QUESTION_BANK,...CAREER_QUESTION_BANK];
 
 export const RATING_LABELS: Record<Rating, { title:string; fallback:string }> = {
   again:{ title:'忘记', fallback:'10 分钟' }, hard:{ title:'困难', fallback:'1 天' },
@@ -136,8 +156,17 @@ export function dueQuestions(questions: Question[], progress: Progress, now = ne
 }
 
 export function questionsForRoute(questions:Question[],route:LearningRoute) {
-  const scoped=route.categories.length?questions.filter(question=>route.categories.includes(question.category)||(question.routeIds||[]).includes(route.id)):questions;
-  if(!route.categories.length)return scoped;
+  const matches=(question:Question)=>{
+    if(route.questionIds?.length)return route.questionIds.includes(question.id);
+    const categoryMatch=!route.categories.length||route.categories.includes(question.category);
+    const roleMatch=!route.roleIds?.length||route.roleIds.some(role=>(question.roleIds||[]).includes(role));
+    const levelMatch=!route.levels?.length||route.levels.some(level=>(question.levels||[]).includes(level));
+    const companyMatch=!route.companyTags?.length||route.companyTags.some(tag=>(question.companyTags||[]).includes(tag));
+    const directionMatch=!route.directionTags?.length||route.directionTags.some(tag=>(question.directionTags||[]).includes(tag));
+    return (categoryMatch&&roleMatch&&levelMatch&&companyMatch&&directionMatch)||(question.routeIds||[]).includes(route.id);
+  };
+  const scoped=questions.filter(matches);
+  if(!route.categories.length)return scoped.sort((a,b)=>a.difficulty-b.difficulty||a.category.localeCompare(b.category,'zh-CN'));
   const categoryOrder=new Map(route.categories.map((category,index)=>[category,index]));
   return scoped.map((question,index)=>({question,index})).sort((a,b)=>(categoryOrder.get(a.question.category)??999)-(categoryOrder.get(b.question.category)??999)||a.question.difficulty-b.question.difficulty||a.index-b.index).map(item=>item.question);
 }
@@ -150,14 +179,52 @@ export function buildDailyQueue(questions:Question[],progress:Progress,history:R
   const newCompleted=todayRecords.filter(record=>firstReview.get(record.questionId)?.id===record.id).length;
   const reviewCompleted=Math.max(0,todayRecords.length-newCompleted);
   const dueReviews=dueQuestions(questions.filter(question=>progress[question.id]),progress,now);
-  const remainingReviewLimit=Math.max(0,settings.dailyGoal-reviewCompleted);
+  const adaptive=adaptiveDailyLimits(history,settings,now);
+  const remainingReviewLimit=Math.max(0,adaptive.reviewLimit-reviewCompleted);
   const reviews=dueReviews.slice(0,remainingReviewLimit);
   const reviewBacklog=Math.max(0,dueReviews.length-reviews.length);
   const routeQuestions=questionsForRoute(questions,route);
   const newQuestions=routeQuestions.filter(question=>!progress[question.id]);
-  const remainingNewLimit=reviewBacklog?0:Math.max(0,settings.dailyNewLimit-newCompleted);
+  const remainingNewLimit=reviewBacklog?0:Math.max(0,adaptive.newLimit-newCompleted);
   const newCards=newQuestions.slice(0,remainingNewLimit);
   return {questions:[...reviews,...newCards],reviewScheduled:reviews.length,newScheduled:newCards.length,reviewCompleted,newCompleted,reviewBacklog,newAvailable:newQuestions.length};
+}
+
+export function adaptiveDailyLimits(history:ReviewRecord[],settings:Settings,now=new Date()){
+  if(!settings.adaptiveDailyGoal||history.length<3)return{newLimit:settings.dailyNewLimit,reviewLimit:settings.dailyGoal,reason:'使用手动上限'};
+  const recent=history.filter(item=>now.getTime()-new Date(item.reviewedAt).getTime()<7*86400000);
+  const activeDays=new Set(recent.map(item=>localDateKey(new Date(item.reviewedAt)))).size;
+  const average=recent.length?recent.reduce((sum,item)=>sum+item.score,0)/recent.length:75;
+  if(activeDays<=2||average<60)return{newLimit:Math.max(1,Math.round(settings.dailyNewLimit*.7)),reviewLimit:Math.max(5,Math.round(settings.dailyGoal*.8)),reason:'近期负担偏高，任务已自动缩减'};
+  if(activeDays>=5&&average>=80)return{newLimit:Math.min(20,settings.dailyNewLimit+1),reviewLimit:Math.min(100,settings.dailyGoal+5),reason:'近期完成稳定，可小幅增加任务'};
+  return{newLimit:settings.dailyNewLimit,reviewLimit:settings.dailyGoal,reason:'近期节奏稳定'};
+}
+
+export type WeeklyReport={start:string;end:string;reviews:number;activeDays:number;newLearned:number;averageScore:number;minutes:number;strongestCategory:string;weakestCategory:string;trend:number;summary:string};
+export function buildWeeklyReport(history:ReviewRecord[],questions:Question[],now=new Date()):WeeklyReport{
+  const end=new Date(now.getFullYear(),now.getMonth(),now.getDate(),23,59,59);const start=new Date(end);start.setDate(start.getDate()-6);start.setHours(0,0,0,0);
+  const previousStart=new Date(start);previousStart.setDate(previousStart.getDate()-7);
+  const current=history.filter(item=>{const value=new Date(item.reviewedAt);return value>=start&&value<=end;});
+  const previous=history.filter(item=>{const value=new Date(item.reviewedAt);return value>=previousStart&&value<start;});
+  const firstByQuestion=new Map<string,string>();history.forEach(item=>{const currentDate=firstByQuestion.get(item.questionId);if(!currentDate||item.reviewedAt<currentDate)firstByQuestion.set(item.questionId,item.reviewedAt);});
+  const categories=[...new Set(current.map(item=>item.category))].map(name=>{const rows=current.filter(item=>item.category===name);return{name,score:rows.reduce((sum,item)=>sum+item.score,0)/rows.length};}).sort((a,b)=>b.score-a.score);
+  const reviews=current.length;const activeDays=new Set(current.map(item=>localDateKey(new Date(item.reviewedAt)))).size;const averageScore=reviews?Math.round(current.reduce((sum,item)=>sum+item.score,0)/reviews):0;const trend=previous.length?Math.round((reviews-previous.length)/previous.length*100):(reviews?100:0);
+  return{start:localDateKey(start),end:localDateKey(end),reviews,activeDays,newLearned:current.filter(item=>firstByQuestion.get(item.questionId)===item.reviewedAt).length,averageScore,minutes:Math.round(current.reduce((sum,item)=>sum+(item.durationSeconds||180),0)/60),strongestCategory:categories[0]?.name||'等待数据',weakestCategory:categories.at(-1)?.name||'等待数据',trend,summary:reviews?`本周学习 ${activeDays} 天、完成 ${reviews} 次主动回忆，平均 ${averageScore} 分。${categories.length>1?`优势在${categories[0].name}，下周优先巩固${categories.at(-1)?.name}。`:'继续保持稳定输出。'}`:'本周还没有学习记录，从完成一个知识点开始即可。'};
+}
+
+export function estimateCompletion(questions:Question[],progress:Progress,route:LearningRoute,settings:Settings,now=new Date()){
+  const remaining=questionsForRoute(questions,route).filter(item=>!progress[item.id]).length;
+  if(!remaining)return{remaining,days:0,date:localDateKey(now)};
+  const perDay=Math.max(1,settings.dailyNewLimit);const days=Math.ceil(remaining/perDay);const target=settings.targetDate?new Date(`${settings.targetDate}T12:00:00`):new Date(now.getTime()+days*86400000);
+  return{remaining,days,date:localDateKey(target)};
+}
+
+export function learningCalendar(history:ReviewRecord[],progress:Progress,days=42,now=new Date()){
+  return Array.from({length:days},(_,index)=>{const date=new Date(now.getFullYear(),now.getMonth(),now.getDate());date.setDate(date.getDate()-(days-1-index));const key=localDateKey(date);const completed=history.filter(item=>localDateKey(new Date(item.reviewedAt))===key).length;const due=Object.values(progress).filter(item=>localDateKey(new Date(item.nextReview))===key).length;return{key,date,completed,due};});
+}
+
+export function consumeStreakFreeze(retention:RetentionState,history:ReviewRecord[],now=new Date()):RetentionState|null{
+  if(retention.streakFreezes<=0)return null;const yesterday=new Date(now.getFullYear(),now.getMonth(),now.getDate());yesterday.setDate(yesterday.getDate()-1);const key=localDateKey(yesterday);if(history.some(item=>localDateKey(new Date(item.reviewedAt))===key)||retention.freezeDates.includes(key))return null;return{...retention,streakFreezes:retention.streakFreezes-1,freezeDates:[...retention.freezeDates,key]};
 }
 
 export function estimatedRecall(item:QuestionProgress|undefined,now=new Date()):number|null {
@@ -173,8 +240,9 @@ export function isMastered(item:QuestionProgress|undefined) {
   return Boolean(item&&item.state==='review'&&(item.stability??item.interval)>=21&&item.lastScore>=70);
 }
 
-export function reviewStreak(history: ReviewRecord[], now = new Date()) {
+export function reviewStreak(history: ReviewRecord[], now = new Date(), freezeDates:string[] = []) {
   const days = new Set(history.map(item => localDateKey(new Date(item.reviewedAt))));
+  freezeDates.forEach(date=>days.add(date));
   const cursor = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   if (!days.has(localDateKey(cursor))) cursor.setDate(cursor.getDate() - 1);
   let count = 0;
@@ -201,16 +269,18 @@ export function safeParse<T>(value: string | null, fallback: T): T {
 }
 
 export function normalizeQuestion(question:Question):Question {
-  return { ...question,tags:Array.isArray(question.tags)?question.tags:[],favorite:Boolean(question.favorite),routeIds:Array.isArray(question.routeIds)?question.routeIds:[],prerequisites:Array.isArray(question.prerequisites)?question.prerequisites:[],source:question.source||'手动' };
+  const levels:CareerLevel[]=Array.isArray(question.levels)&&question.levels.length?question.levels:[question.difficulty===1?'junior':question.difficulty===2?'mid':'senior'];
+  const companyTags=Array.isArray(question.companyTags)?question.companyTags:question.difficulty===3?['大厂通用']:(['数据库','Redis','消息队列','分布式'].includes(question.category)?['金融高可用']:['创业全栈']);
+  return { ...question,tags:Array.isArray(question.tags)?question.tags:[],favorite:Boolean(question.favorite),routeIds:Array.isArray(question.routeIds)?question.routeIds:[],roleIds:Array.isArray(question.roleIds)?question.roleIds:question.id.startsWith('java-')?['java-backend']:[],levels,companyTags,directionTags:Array.isArray(question.directionTags)?question.directionTags:[],prerequisites:Array.isArray(question.prerequisites)?question.prerequisites:[],bankVersion:question.bankVersion||1,source:question.source||'手动' };
 }
 
-export function createSnapshot(questions:Question[],progress:Progress,history:ReviewRecord[],settings:Settings,interviewReports:InterviewReport[]):AppSnapshot {
-  return {version:4,questions:questions.map(normalizeQuestion),progress,history,settings:{...DEFAULT_SETTINGS,...settings},interviewReports};
+export function createSnapshot(questions:Question[],progress:Progress,history:ReviewRecord[],settings:Settings,interviewReports:InterviewReport[],customRoutes:LearningRoute[]=[],retention:RetentionState=DEFAULT_RETENTION):AppSnapshot {
+  return {version:5,questions:questions.map(normalizeQuestion),progress,history,settings:{...DEFAULT_SETTINGS,...settings},interviewReports,customRoutes,retention:{...DEFAULT_RETENTION,...retention,freezeDates:[...(retention.freezeDates||[])]}};
 }
 
 export function mergeBuiltInQuestions(questions:Question[]) {
   const existing=new Map(questions.map(item=>[item.id,normalizeQuestion(item)]));
-  for(const item of DEFAULT_QUESTIONS) if(!existing.has(item.id)) existing.set(item.id,normalizeQuestion(item));
+  for(const item of DEFAULT_QUESTIONS){const normalized=normalizeQuestion(item);const current=existing.get(item.id);if(!current)existing.set(item.id,normalized);else existing.set(item.id,{...normalized,...current,routeIds:[...new Set([...(normalized.routeIds||[]),...(current.routeIds||[])])],roleIds:[...new Set([...(normalized.roleIds||[]),...(current.roleIds||[])])],levels:[...new Set([...(normalized.levels||[]),...(current.levels||[])])],companyTags:[...new Set([...(normalized.companyTags||[]),...(current.companyTags||[])])],directionTags:[...new Set([...(normalized.directionTags||[]),...(current.directionTags||[])])]});}
   return [...existing.values()];
 }
 

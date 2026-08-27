@@ -37,3 +37,8 @@ next-env.d.ts
 /outputs/
 /work/
 *.tsbuildinfo
+android/.gradle/
+android/local.properties
+android/**/build/
+*.jks
+*.keystore

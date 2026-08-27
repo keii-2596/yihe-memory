@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.yihe.memory",
+      "sha256_cert_fingerprints": [
+        "CE:96:E4:02:9F:EF:31:15:16:66:BC:58:A6:2C:A0:EF:E7:D3:FD:99:C8:4A:E6:3A:08:FF:23:67:EE:E4:B2:D7"
+      ]
+    }
+  }
+]
