@@ -1,7 +1,7 @@
 'use client';
 
 import { ChangeEvent, useEffect, useState } from 'react';
-import { DEFAULT_PROMPTS, InterviewRetrospective, LearningRoute, PromptKey, PromptTemplates, Question, RetentionState, Settings, WeeklyReport } from '../lib/model';
+import { DEFAULT_PROMPTS, InterviewRetrospective, isCardAvailable, LearningRoute, PromptKey, PromptTemplates, Progress, Question, questionsForRoute, RetentionState, Settings, WeeklyReport } from '../lib/model';
 
 type PersonalApi={enabled:boolean;endpoint:string;apiKey:string;model:string};
 const personalPayload=(value:PersonalApi)=>value.enabled?{endpoint:value.endpoint,apiKey:value.apiKey,model:value.model}:undefined;
@@ -21,6 +21,21 @@ export function WordbookEditorModal({route,questions,onSave,onDelete,onEditQuest
   const categories=['全部',...new Set(questions.map(item=>item.category))];const visible=questions.filter(item=>(category==='全部'||item.category===category)&&`${item.title}${item.category}${(item.tags||[]).join('')}`.toLowerCase().includes(search.toLowerCase()));
   function toggle(id:string){setSelected(ids=>ids.includes(id)?ids.filter(value=>value!==id):[...ids,id]);}
   return <div className="modal-backdrop" onMouseDown={event=>{if(event.currentTarget===event.target)onClose();}}><section className="question-editor wordbook-modal" role="dialog" aria-modal="true"><div className="editor-head"><div><span className="section-label">CUSTOM WORD BOOK</span><h2>{route.id?'编辑自定义词书':'新建词书'}</h2></div><button onClick={onClose}>×</button></div><div className="editor-grid"><label className="full">词书名称<input value={name} onChange={event=>setName(event.target.value)} placeholder="例如：秋招 Java 冲刺"/></label><label className="full">说明<textarea value={description} onChange={event=>setDescription(event.target.value)} placeholder="这本词书的目标与范围"/></label></div><div className="wordbook-toolbar"><label>⌕<input value={search} onChange={event=>setSearch(event.target.value)} placeholder="搜索知识点、分类或标签"/></label><select value={category} onChange={event=>setCategory(event.target.value)}>{categories.map(value=><option key={value}>{value}</option>)}</select><b>已选 {selected.length} 个</b></div><div className="wordbook-question-list">{visible.map(question=><article key={question.id} className={selected.includes(question.id)?'selected':''}><label><input type="checkbox" checked={selected.includes(question.id)} onChange={()=>toggle(question.id)}/><span><b>{question.title}</b><small>{question.category} · {(question.tags||[]).join(' / ')||'未加标签'}</small></span></label><button onClick={()=>onEditQuestion(question)}>编辑内容</button></article>)}</div><div className="editor-actions wordbook-actions">{onDelete&&<button className="danger-link" onClick={onDelete}>删除这本词书</button>}<button className="secondary-action" onClick={onClose}>取消</button><button className="primary-action" disabled={!name.trim()||!selected.length} onClick={()=>onSave({...route,id:route.id||`book-${Date.now().toString(36)}`,name:name.trim(),description:description.trim()||'自定义面试知识词书',categories:[],questionIds:selected,source:route.source==='jd'||route.source==='interview'?route.source:'custom',createdAt:route.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()})}>保存词书（{selected.length}）</button></div></section></div>;
+}
+
+export type CustomStudyMode='due'|'forgotten'|'favorite'|'ahead'|'new'|'random';
+const customModes:{id:CustomStudyMode;name:string;description:string}[]=[
+  {id:'due',name:'清理到期',description:'只练当前词书里已经到期的卡片'},
+  {id:'forgotten',name:'反复遗忘',description:'优先练习遗忘次数最多的卡片'},
+  {id:'favorite',name:'收藏专项',description:'只练习标记为收藏的卡片'},
+  {id:'ahead',name:'提前复习',description:'按下次到期时间提前练习'},
+  {id:'new',name:'加练新题',description:'在今日上限之外增加一组新知识'},
+  {id:'random',name:'随机抽查',description:'从整本词书随机抽取一组卡片'},
+];
+export function CustomStudyModal({route,questions,progress,onStart,onClose}:{route:LearningRoute;questions:Question[];progress:Progress;onStart:(mode:CustomStudyMode,count:number,reschedule:boolean)=>void;onClose:()=>void}){
+  const [mode,setMode]=useState<CustomStudyMode>('due');const [count,setCount]=useState(20);const [reschedule,setReschedule]=useState(true);const scoped=questionsForRoute(questions,route).filter(item=>isCardAvailable(item));
+  const countFor=(id:CustomStudyMode)=>scoped.filter(item=>id==='due'?Boolean(progress[item.id]&&new Date(progress[item.id].nextReview)<=new Date()):id==='forgotten'?(progress[item.id]?.lapses||0)>=4:id==='favorite'?item.favorite:id==='ahead'?Boolean(progress[item.id]&&new Date(progress[item.id].nextReview)>new Date()):id==='new'?!progress[item.id]:true).length;
+  return <div className="modal-backdrop" onMouseDown={event=>{if(event.currentTarget===event.target)onClose();}}><section className="question-editor custom-study-modal" role="dialog" aria-modal="true"><div className="editor-head"><div><span className="section-label">CUSTOM STUDY</span><h2>自定义学习 · {route.name}</h2></div><button onClick={onClose}>×</button></div><p className="modal-intro">临时跳出每日计划，集中处理薄弱、收藏或即将到期的内容。暂停和今日隐藏的卡片不会被抽取。</p><div className="custom-mode-grid">{customModes.map(item=><button key={item.id} className={mode===item.id?'selected':''} onClick={()=>{setMode(item.id);if(item.id==='ahead'||item.id==='random')setReschedule(false);}}><span><b>{item.name}</b><small>{item.description}</small></span><em>{countFor(item.id)} 张</em></button>)}</div><label className="custom-count">本次题量 <b>{count} 张</b><input type="range" min="5" max="100" step="5" value={count} onChange={event=>setCount(Number(event.target.value))}/></label><label className="toggle-setting custom-reschedule"><input type="checkbox" checked={reschedule} onChange={event=>setReschedule(event.target.checked)}/><span><b>根据本次结果更新复习计划</b><small>{reschedule?'答题后会重新计算下次复习时间':'仅练习，不改变原计划和历史'}</small></span></label><div className="editor-actions"><button className="secondary-action" onClick={onClose}>取消</button><button className="primary-action" disabled={!countFor(mode)} onClick={()=>onStart(mode,count,reschedule)}>开始学习</button></div></section></div>;
 }
 
 const promptMeta:{id:PromptKey;name:string;description:string;variables:string}[]=[

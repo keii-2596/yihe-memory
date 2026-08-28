@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { safeAuthUrl, safeEqual } from './auth-policy.ts';
-import { DEFAULT_QUESTIONS, DEFAULT_RETENTION, DEFAULT_SETTINGS, LEARNING_ROUTES, adaptiveDailyLimits, buildDailyQueue, buildWeeklyReport, consumeStreakFreeze, createSnapshot, dueQuestions, estimateCompletion, estimatedRecall, learningCalendar, mergeBuiltInQuestions, parseImportedCards, questionsForRoute, reviewStreak, scheduleReview } from './model.ts';
+import { DEFAULT_QUESTIONS, DEFAULT_RETENTION, DEFAULT_SETTINGS, LEARNING_ROUTES, adaptiveDailyLimits, buildDailyQueue, buildWeeklyReport, consumeStreakFreeze, createSnapshot, dueQuestions, estimateCompletion, estimatedRecall, isCardAvailable, learningCalendar, mergeBuiltInQuestions, parseImportedCards, questionsForRoute, reviewStreak, scheduleReview } from './model.ts';
 
 const now = new Date('2026-08-26T08:00:00.000Z');
 const question = DEFAULT_QUESTIONS[0];
@@ -49,6 +49,20 @@ test('overdue reviews are prioritized and pause new knowledge when backlog remai
   assert.equal(queue.reviewScheduled,1);
   assert.equal(queue.reviewBacklog,1);
   assert.equal(queue.newScheduled,0);
+});
+
+test('suspended and today-hidden cards stay out of the daily queue without losing progress', () => {
+  const active={...DEFAULT_QUESTIONS[0],id:'active-card'};
+  const suspended={...DEFAULT_QUESTIONS[1],id:'suspended-card',suspended:true};
+  const buried={...DEFAULT_QUESTIONS[2],id:'buried-card',buriedUntil:'2026-08-27T00:00:00.000Z'};
+  const progress=Object.fromEntries([active,suspended,buried].map(item=>[item.id,{...scheduleReview(item,undefined,'good',80,new Date('2026-08-20T08:00:00.000Z')),nextReview:'2026-08-21T08:00:00.000Z'}]));
+  const route={id:'control-test',name:'测试',description:'',categories:[],questionIds:[active.id,suspended.id,buried.id]};
+  const queue=buildDailyQueue([active,suspended,buried],progress,[],{...DEFAULT_SETTINGS,dailyGoal:10},route,now);
+  assert.deepEqual(queue.questions.map(item=>item.id),[active.id]);
+  assert.equal(isCardAvailable(suspended,now),false);
+  assert.equal(isCardAvailable(buried,now),false);
+  assert.equal(isCardAvailable(buried,new Date('2026-08-28T08:00:00.000Z')),true);
+  assert.equal(progress[suspended.id].reviews,1);
 });
 
 test('routes order new knowledge and recall is derived from personal timing data', () => {

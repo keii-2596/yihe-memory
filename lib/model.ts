@@ -23,6 +23,8 @@ export type Question = {
   prerequisites?: string[];
   bankVersion?: number;
   source?: string;
+  suspended?: boolean;
+  buriedUntil?: string;
 };
 
 export type QuestionProgress = {
@@ -60,6 +62,7 @@ export type ReviewRecord = {
   fillerCount?: number;
   hintUsed?: boolean;
   referenceViewed?: boolean;
+  previousProgress?: QuestionProgress | null;
 };
 
 export type Settings = {
@@ -158,7 +161,7 @@ export function scheduleReview(question: Question, previous: QuestionProgress | 
 }
 
 export function dueQuestions(questions: Question[], progress: Progress, now = new Date()) {
-  return [...questions].filter(question => !progress[question.id] || new Date(progress[question.id].nextReview) <= now).sort((a,b) => {
+  return [...questions].filter(question => isCardAvailable(question,now)&&(!progress[question.id] || new Date(progress[question.id].nextReview) <= now)).sort((a,b) => {
     const aDate = progress[a.id]?.nextReview ?? '';
     const bDate = progress[b.id]?.nextReview ?? '';
     if (!aDate && bDate) return -1;
@@ -197,7 +200,7 @@ export function buildDailyQueue(questions:Question[],progress:Progress,history:R
   const reviews=dueReviews.slice(0,remainingReviewLimit);
   const reviewBacklog=Math.max(0,dueReviews.length-reviews.length);
   const routeQuestions=questionsForRoute(questions,route);
-  const newQuestions=routeQuestions.filter(question=>!progress[question.id]);
+  const newQuestions=routeQuestions.filter(question=>isCardAvailable(question,now)&&!progress[question.id]);
   const remainingNewLimit=reviewBacklog?0:Math.max(0,adaptive.newLimit-newCompleted);
   const newCards=newQuestions.slice(0,remainingNewLimit);
   return {questions:[...reviews,...newCards],reviewScheduled:reviews.length,newScheduled:newCards.length,reviewCompleted,newCompleted,reviewBacklog,newAvailable:newQuestions.length};
@@ -284,7 +287,11 @@ export function safeParse<T>(value: string | null, fallback: T): T {
 export function normalizeQuestion(question:Question):Question {
   const levels:CareerLevel[]=Array.isArray(question.levels)&&question.levels.length?question.levels:[question.difficulty===1?'junior':question.difficulty===2?'mid':'senior'];
   const companyTags=Array.isArray(question.companyTags)?question.companyTags:question.difficulty===3?['大厂通用']:(['数据库','Redis','消息队列','分布式'].includes(question.category)?['金融高可用']:['创业全栈']);
-  return { ...question,tags:Array.isArray(question.tags)?question.tags:[],favorite:Boolean(question.favorite),routeIds:Array.isArray(question.routeIds)?question.routeIds:[],roleIds:Array.isArray(question.roleIds)?question.roleIds:question.id.startsWith('java-')?['java-backend']:[],levels,companyTags,directionTags:Array.isArray(question.directionTags)?question.directionTags:[],prerequisites:Array.isArray(question.prerequisites)?question.prerequisites:[],bankVersion:question.bankVersion||1,source:question.source||'手动' };
+  return { ...question,tags:Array.isArray(question.tags)?question.tags:[],favorite:Boolean(question.favorite),routeIds:Array.isArray(question.routeIds)?question.routeIds:[],roleIds:Array.isArray(question.roleIds)?question.roleIds:question.id.startsWith('java-')?['java-backend']:[],levels,companyTags,directionTags:Array.isArray(question.directionTags)?question.directionTags:[],prerequisites:Array.isArray(question.prerequisites)?question.prerequisites:[],bankVersion:question.bankVersion||1,source:question.source||'手动',suspended:Boolean(question.suspended),buriedUntil:question.buriedUntil||undefined };
+}
+
+export function isCardAvailable(question:Question,now=new Date()){
+  return !question.suspended&&(!question.buriedUntil||new Date(question.buriedUntil)<=now);
 }
 
 export function createSnapshot(questions:Question[],progress:Progress,history:ReviewRecord[],settings:Settings,interviewReports:InterviewReport[],customRoutes:LearningRoute[]=[],retention:RetentionState=DEFAULT_RETENTION,interviewRetrospectives:InterviewRetrospective[]=[]):AppSnapshot {
