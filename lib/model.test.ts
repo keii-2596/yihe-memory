@@ -100,10 +100,11 @@ test('career bank covers six roles plus junior, mid and senior routes', () => {
   }
 });
 
-test('snapshot v5 preserves custom routes, retention and upgraded question metadata', () => {
+test('snapshot v6 preserves word books, prompts, retrospectives and upgraded metadata', () => {
   const customRoute={id:'jd-test',name:'JD 测试',description:'岗位路线',categories:[],questionIds:[question.id],source:'jd' as const};
-  const snapshot=createSnapshot([question],{},[],DEFAULT_SETTINGS,[],[customRoute],{streakFreezes:0,freezeDates:['2026-08-25']});
-  assert.equal(snapshot.version,5);assert.equal(snapshot.customRoutes[0].id,'jd-test');assert.deepEqual(snapshot.retention.freezeDates,['2026-08-25']);assert.ok(snapshot.questions[0].levels?.length);
+  const retrospective={id:'retro-1',createdAt:'2026-08-28T00:00:00.000Z',role:'Java 后端',summary:'复盘完成',overallFeedback:'继续补强事务',strengths:['表达清楚'],weaknesses:['事务隔离'],topics:[],actionPlan:['复习'],questionIds:[question.id],transcriptPreview:'面试文字稿摘要',source:'ai' as const};
+  const snapshot=createSnapshot([question],{},[],DEFAULT_SETTINGS,[],[customRoute],{streakFreezes:0,freezeDates:['2026-08-25']},[retrospective]);
+  assert.equal(snapshot.version,6);assert.equal(snapshot.customRoutes[0].id,'jd-test');assert.equal(snapshot.interviewRetrospectives[0].id,'retro-1');assert.ok(snapshot.settings.prompts.interviewReview.includes('{transcript}'));assert.deepEqual(snapshot.retention.freezeDates,['2026-08-25']);assert.ok(snapshot.questions[0].levels?.length);
 });
 
 test('retention helpers create reports, calendars, estimates and safe streak freezes', () => {

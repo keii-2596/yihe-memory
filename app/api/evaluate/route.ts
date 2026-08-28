@@ -9,6 +9,7 @@ type EvaluationRequest = {
   model?: string;
   dailyLimit?: number;
   testConnection?: boolean;
+  prompt?: string;
   personalApi?: {
     endpoint?: string;
     apiKey?: string;
@@ -143,7 +144,8 @@ export async function POST(request: Request) {
   const chatUser=await getAppUser(); const dailyLimit=Math.max(5,Math.min(100,Number(input.dailyLimit)||30));
   if (chatUser && await usageFor(chatUser.userId)>=dailyLimit) return Response.json({ ...fallback, summary:`今日 AI 判题额度已用完（${dailyLimit} 次），本次使用本地评估。${fallback.summary}` });
 
-  const system = `你是一名严格但鼓励式的计算机面试教练。评价答案时关注概念覆盖、逻辑准确和表达清晰，不要求逐字匹配参考答案。只输出 JSON，不要 markdown。字段必须为：score(0-100数字)、verdict(短句)、summary(1-2句)、hitPoints(字符串数组)、missedPoints(字符串数组)、suggestion(一句可执行建议)。`;
+  const custom=String(input.prompt||'').slice(0,12000).replace(/\{question\}/g,evaluationInput.question).replace(/\{answer\}/g,evaluationInput.answer).replace(/\{keyPoints\}/g,evaluationInput.keyPoints.join('；')).replace(/\{reference\}/g,evaluationInput.reference);
+  const system = `${custom||'你是一名严格但鼓励式的计算机面试教练。评价答案时关注概念覆盖、逻辑准确和表达清晰，不要求逐字匹配参考答案。'}\n只输出 JSON，不要 markdown。字段必须为：score(0-100数字)、verdict(短句)、summary(1-2句)、hitPoints(字符串数组)、missedPoints(字符串数组)、suggestion(一句可执行建议)。`;
   const userPrompt = JSON.stringify({ question:evaluationInput.question, answer:evaluationInput.answer, scoring_points:evaluationInput.keyPoints, reference_answer:evaluationInput.reference });
   try {
     const model=provider.model; let response:Response|null=null;

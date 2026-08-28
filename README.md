@@ -5,7 +5,9 @@
 ## 核心能力
 
 - 163 道内置 Java 八股卡片，覆盖语言基础、集合、JVM、并发、Spring、数据库、Redis、消息队列、分布式与系统设计
-- Java 全栈、核心基础、JVM 与并发、Spring 与数据层、分布式等学习路线
+- 官方与自定义学习词书：支持复制、改名、增删知识点，以及从 JD 自动生成
+- 面试复盘：上传录音或文字稿，由 AI 提取薄弱知识并生成复习题与专属词书
+- Prompt 工作台：判题、追问、制卡、JD、转写和复盘均可在前端自定义提示词
 - AI 判题、个人 API 配置与连通性测试、参考答案自查、追问、本地评分回退与每日调用额度
 - 文字回答、浏览器语音识别与服务端录音转写
 - 分级提示、按需查看答案、间隔重复与个人预计记住率
@@ -17,7 +19,7 @@
 - 回答历史、同题对比、掌握度统计与反复遗漏诊断
 - JSON / CSV / Markdown 导入、AI 从材料制卡、知识包分享
 - 匿名本机模式，以及可选 ChatGPT、GitHub、Google、邮箱、Cloudflare Access 和自托管 SSO 接入
-- D1 账号隔离同步、R2 录音暂存、离线缓存和每日版本备份
+- D1 账号隔离同步、离线缓存和每日版本备份；原始面试录音不会长期保存
 - PWA、移动端布局、键盘操作与无障碍焦点样式
 
 ## 快速开始
@@ -67,11 +69,11 @@ pnpm verify
 
 ## 题库与贡献
 
-题库结构、分类和升级规则见 [Java 题库说明](docs/QUESTION_BANK.md)，每日任务、学习路线与记忆指标见 [学习机制说明](docs/LEARNING_METHOD.md)。欢迎按 [贡献指南](CONTRIBUTING.md) 补题、纠错和改进功能。安全问题请遵循 [安全策略](SECURITY.md) 私密报告。
+题库结构、分类和升级规则见 [Java 题库说明](docs/QUESTION_BANK.md)，每日任务、学习词书与记忆指标见 [学习机制说明](docs/LEARNING_METHOD.md)。欢迎按 [贡献指南](CONTRIBUTING.md) 补题、纠错和改进功能。安全问题请遵循 [安全策略](SECURITY.md) 私密报告。
 
 ## 部署与存储
 
-项目使用 Next.js/Vinext，可部署到 OpenAI Sites 或兼容 Cloudflare Workers 的环境。持久化云同步需要 D1，录音暂存需要 R2；不绑定云存储时仍可作为本地优先应用使用。
+项目使用 Next.js/Vinext，可部署到 OpenAI Sites 或兼容 Cloudflare Workers 的环境。持久化云同步需要 D1；不绑定云存储时仍可作为本地优先应用使用。
 
 留存与多渠道提醒的部署方式见 [留存与提醒文档](docs/RETENTION_AND_REMINDERS.md)。可安装 Android 客户端工程位于 [`android/`](android/README.md)，采用 Android 官方推荐的 Trusted Web Activity，与网页共用登录和云数据。
 

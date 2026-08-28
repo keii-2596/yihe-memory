@@ -65,17 +65,30 @@ export type ReviewRecord = {
 export type Settings = {
   dailyGoal:number; dailyNewLimit:number; targetRetention:number; reminderTime:string; notifications:boolean;
   model:string; dailyAiLimit:number; selectedRoute:string; compactMobile:boolean; adaptiveDailyGoal:boolean; weeklyGoal:number; targetDate:string;
+  prompts:PromptTemplates;
+};
+
+export type PromptKey='evaluate'|'followup'|'cardGeneration'|'jdRoute'|'transcription'|'interviewReview';
+export type PromptTemplates=Record<PromptKey,string>;
+export const DEFAULT_PROMPTS:PromptTemplates={
+  evaluate:'你是一名严格但鼓励式的计算机面试教练。请评价候选人对“{question}”的回答。关注概念覆盖、逻辑准确和表达清晰，不要求逐字匹配。评分要点：{keyPoints}\n参考答案：{reference}\n候选人回答：{answer}\n只输出约定的 JSON。',
+  followup:'你是计算机面试官。请基于原题“{question}”、候选人回答“{answer}”和遗漏点“{missedPoints}”，只给出一个自然、具体、能检验真实理解的中文追问，不要解释。',
+  cardGeneration:'从下面材料中生成最多 {count} 张计算机面试记忆卡。问题必须可独立理解，参考答案必须忠于材料，并给出 2—6 个可评分要点。材料：\n{material}',
+  jdRoute:'分析下面岗位描述，提炼岗位方向、级别与技能关键词，并从候选题目中选择最相关的知识点形成面试词书。岗位描述：\n{jd}',
+  transcription:'请准确转写这段中文技术面试录音。保留技术名词、问题与回答的边界；不确定的词不要擅自补写。',
+  interviewReview:'你是一名资深技术面试教练。分析“{role}”面试的文字稿，找出表现亮点、知识薄弱点和被问到但回答不完整的主题，并生成可用于间隔复习的题目。不要猜测文字稿中没有的信息。文字稿：\n{transcript}',
 };
 
 export type InterviewReport = { id:string; role:string; questionIds:string[]; scores:number[]; startedAt:string; completedAt:string; durationSeconds:number };
+export type InterviewRetrospective={id:string;createdAt:string;role:string;summary:string;overallFeedback:string;strengths:string[];weaknesses:string[];topics:{name:string;category:string;evidence:string;priority:'high'|'medium'|'low'}[];actionPlan:string[];questionIds:string[];transcriptPreview:string;source:'ai'|'local';model?:string};
 export type RetentionState={ streakFreezes:number; freezeDates:string[]; lastWeeklyReportAt?:string };
-export type LearningRoute={id:string;name:string;description:string;categories:string[];roleIds?:string[];levels?:CareerLevel[];companyTags?:string[];directionTags?:string[];questionIds?:string[];source?:'built-in'|'jd'};
-export type AppSnapshot = { version:5; questions:Question[]; progress:Progress; history:ReviewRecord[]; settings:Settings; interviewReports:InterviewReport[]; customRoutes:LearningRoute[]; retention:RetentionState };
+export type LearningRoute={id:string;name:string;description:string;categories:string[];roleIds?:string[];levels?:CareerLevel[];companyTags?:string[];directionTags?:string[];questionIds?:string[];source?:'built-in'|'jd'|'custom'|'interview';createdAt?:string;updatedAt?:string};
+export type AppSnapshot = { version:6; questions:Question[]; progress:Progress; history:ReviewRecord[]; settings:Settings; interviewReports:InterviewReport[]; interviewRetrospectives:InterviewRetrospective[]; customRoutes:LearningRoute[]; retention:RetentionState };
 export const DEFAULT_RETENTION:RetentionState={streakFreezes:1,freezeDates:[]};
-export const DEFAULT_SETTINGS:Settings={ dailyGoal:20,dailyNewLimit:5,targetRetention:.9,reminderTime:'20:00',notifications:false,model:'gpt-4.1-mini',dailyAiLimit:30,selectedRoute:'java-backend',compactMobile:false,adaptiveDailyGoal:true,weeklyGoal:5,targetDate:'' };
+export const DEFAULT_SETTINGS:Settings={ dailyGoal:20,dailyNewLimit:5,targetRetention:.9,reminderTime:'20:00',notifications:false,model:'gpt-4.1-mini',dailyAiLimit:30,selectedRoute:'java-backend',compactMobile:false,adaptiveDailyGoal:true,weeklyGoal:5,targetDate:'',prompts:DEFAULT_PROMPTS };
 const JAVA_BACKEND_CATEGORIES=['Java 基础','面向对象','集合框架','Java IO','Java 新特性','JVM','Java 并发','Spring','Spring Boot','MyBatis','数据库','Redis','消息队列','分布式','系统设计'];
 export const LEARNING_ROUTES:LearningRoute[]=[
-  { id:'java-backend',name:'Java 后端循序路线',description:'按基础、JVM、框架、数据与分布式逐步引入新知识',categories:JAVA_BACKEND_CATEGORIES },
+  { id:'java-backend',name:'Java 后端核心词书',description:'按基础、JVM、框架、数据与分布式逐步引入新知识',categories:JAVA_BACKEND_CATEGORIES,source:'built-in' },
   { id:'java-core',name:'Java 核心基础',description:'语言、面向对象、集合、IO 与新特性',categories:['Java 基础','面向对象','集合框架','Java IO','Java 新特性'] },
   { id:'jvm-concurrency',name:'JVM 与并发',description:'内存、GC、类加载、锁和线程池',categories:['JVM','Java 并发'] },
   { id:'spring-data',name:'Spring 与数据层',description:'Spring、Boot、MyBatis、MySQL 与 Redis',categories:['Spring','Spring Boot','MyBatis','数据库','Redis'] },
@@ -274,8 +287,8 @@ export function normalizeQuestion(question:Question):Question {
   return { ...question,tags:Array.isArray(question.tags)?question.tags:[],favorite:Boolean(question.favorite),routeIds:Array.isArray(question.routeIds)?question.routeIds:[],roleIds:Array.isArray(question.roleIds)?question.roleIds:question.id.startsWith('java-')?['java-backend']:[],levels,companyTags,directionTags:Array.isArray(question.directionTags)?question.directionTags:[],prerequisites:Array.isArray(question.prerequisites)?question.prerequisites:[],bankVersion:question.bankVersion||1,source:question.source||'手动' };
 }
 
-export function createSnapshot(questions:Question[],progress:Progress,history:ReviewRecord[],settings:Settings,interviewReports:InterviewReport[],customRoutes:LearningRoute[]=[],retention:RetentionState=DEFAULT_RETENTION):AppSnapshot {
-  return {version:5,questions:questions.map(normalizeQuestion),progress,history,settings:{...DEFAULT_SETTINGS,...settings},interviewReports,customRoutes,retention:{...DEFAULT_RETENTION,...retention,freezeDates:[...(retention.freezeDates||[])]}};
+export function createSnapshot(questions:Question[],progress:Progress,history:ReviewRecord[],settings:Settings,interviewReports:InterviewReport[],customRoutes:LearningRoute[]=[],retention:RetentionState=DEFAULT_RETENTION,interviewRetrospectives:InterviewRetrospective[]=[]):AppSnapshot {
+  return {version:6,questions:questions.map(normalizeQuestion),progress,history,settings:{...DEFAULT_SETTINGS,...settings,prompts:{...DEFAULT_PROMPTS,...settings.prompts}},interviewReports,interviewRetrospectives,customRoutes,retention:{...DEFAULT_RETENTION,...retention,freezeDates:[...(retention.freezeDates||[])]}};
 }
 
 export function mergeBuiltInQuestions(questions:Question[]) {
