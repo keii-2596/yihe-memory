@@ -10,6 +10,7 @@
     "dev": "vinext dev",
     "build": "vinext build",
     "start": "vinext start",
+    "codex:gateway": "node codex-gateway/server.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "test": "node --experimental-strip-types --test lib/*.test.ts",
     "typecheck": "tsc --noEmit",

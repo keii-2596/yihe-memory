@@ -1,5 +1,6 @@
 import { ensureSchema, getDb } from '../../../db';
 import { getAppUser } from '../../chatgpt-auth';
+import { evaluateWithCodex } from '../../../lib/codex-gateway';
 
 type EvaluationRequest = {
   question?: string;
@@ -10,6 +11,7 @@ type EvaluationRequest = {
   dailyLimit?: number;
   testConnection?: boolean;
   prompt?: string;
+  useCodex?: boolean;
   personalApi?: {
     endpoint?: string;
     apiKey?: string;
@@ -128,7 +130,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const input = await request.json() as EvaluationRequest;
   let provider:ProviderConfig|null;
-  try{provider=personalProvider(input.personalApi)||deploymentProvider(input);}catch(error){return Response.json({ok:false,error:error instanceof Error?error.message:'个人 API 配置无效'},{status:400});}
+  try{provider=input.useCodex?null:personalProvider(input.personalApi)||deploymentProvider(input);}catch(error){return Response.json({ok:false,error:error instanceof Error?error.message:'个人 API 配置无效'},{status:400});}
   if(input.testConnection){
     if(!input.personalApi||!provider?.personal)return Response.json({ok:false,error:'请先填写个人 API 配置'},{status:400});
     try{
@@ -140,9 +142,17 @@ export async function POST(request: Request) {
   if (!input?.question || !input?.answer || !Array.isArray(input?.keyPoints)) return Response.json({ error:'invalid_request' }, { status:400 });
   const evaluationInput={...input,question:input.question,answer:input.answer,keyPoints:input.keyPoints,reference:String(input.reference||'')} as EvaluationInput;
   const fallback = localEvaluate(evaluationInput);
-  if (!provider) return Response.json(fallback);
   const chatUser=await getAppUser(); const dailyLimit=Math.max(5,Math.min(100,Number(input.dailyLimit)||30));
   if (chatUser && await usageFor(chatUser.userId)>=dailyLimit) return Response.json({ ...fallback, summary:`今日 AI 判题额度已用完（${dailyLimit} 次），本次使用本地评估。${fallback.summary}` });
+
+  if(input.useCodex){
+    try{
+      const result=await evaluateWithCodex(chatUser,{question:evaluationInput.question,answer:evaluationInput.answer,keyPoints:evaluationInput.keyPoints,reference:evaluationInput.reference,prompt:input.prompt});
+      if(chatUser)await recordUsage(chatUser.userId,Math.ceil((evaluationInput.answer.length+evaluationInput.reference.length)/2));
+      return Response.json({...cleanEvaluation(result,fallback),model:result.model||'codex-account'});
+    }catch{return Response.json({...fallback,summary:`Codex 私人网关暂时不可用，本次已使用本地评估。${fallback.summary}`});}
+  }
+  if (!provider) return Response.json(fallback);
 
   const custom=String(input.prompt||'').slice(0,12000).replace(/\{question\}/g,evaluationInput.question).replace(/\{answer\}/g,evaluationInput.answer).replace(/\{keyPoints\}/g,evaluationInput.keyPoints.join('；')).replace(/\{reference\}/g,evaluationInput.reference);
   const system = `${custom||'你是一名严格但鼓励式的计算机面试教练。评价答案时关注概念覆盖、逻辑准确和表达清晰，不要求逐字匹配参考答案。'}\n只输出 JSON，不要 markdown。字段必须为：score(0-100数字)、verdict(短句)、summary(1-2句)、hitPoints(字符串数组)、missedPoints(字符串数组)、suggestion(一句可执行建议)。`;
