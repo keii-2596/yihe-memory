@@ -1,5 +1,6 @@
 import { JAVA_QUESTION_BANK } from '../data/java-bank.ts';
 import { CAREER_QUESTION_BANK } from '../data/career-bank.ts';
+import { EXPANDED_QUESTION_BANK } from '../data/expanded-bank.ts';
 
 export type Rating = 'again' | 'hard' | 'good' | 'easy';
 export type CareerLevel = 'junior' | 'mid' | 'senior';
@@ -120,7 +121,7 @@ export type DailyQueue = {
   newAvailable:number;
 };
 
-export const DEFAULT_QUESTIONS:Question[]=[...JAVA_QUESTION_BANK,...CAREER_QUESTION_BANK];
+export const DEFAULT_QUESTIONS:Question[]=[...JAVA_QUESTION_BANK,...CAREER_QUESTION_BANK,...EXPANDED_QUESTION_BANK];
 
 export const RATING_LABELS: Record<Rating, { title:string; fallback:string }> = {
   again:{ title:'忘记', fallback:'10 分钟' }, hard:{ title:'困难', fallback:'1 天' },

@@ -81,11 +81,11 @@ test('CSV and Markdown can be imported as cards', () => {
 });
 
 test('built-in Java bank is complete and structurally valid', () => {
-  assert.ok(DEFAULT_QUESTIONS.length>=160);
+  assert.ok(DEFAULT_QUESTIONS.length>=600&&DEFAULT_QUESTIONS.length<=800);
   assert.equal(new Set(DEFAULT_QUESTIONS.map(item=>item.id)).size,DEFAULT_QUESTIONS.length);
   assert.equal(new Set(DEFAULT_QUESTIONS.map(item=>item.title)).size,DEFAULT_QUESTIONS.length);
   for(const item of DEFAULT_QUESTIONS){
-    assert.ok(item.category); assert.ok(item.title); assert.ok(item.reference);
+    assert.ok(item.category); assert.ok(item.title); assert.ok(item.hint); assert.ok(item.reference.length>=20,`${item.id} needs a useful reference answer`);
     assert.ok(item.keyPoints.length>=3,`${item.id} needs at least 3 key points`);
     assert.ok([1,2,3].includes(item.difficulty));
   }
@@ -106,7 +106,8 @@ test('bank migration preserves custom cards and existing edits without duplicate
 test('career bank covers six roles plus junior, mid and senior routes', () => {
   for(const routeId of ['java-backend','frontend','go-backend','python-backend','qa','devops']){
     const route=LEARNING_ROUTES.find(item=>item.id===routeId)!;
-    assert.ok(questionsForRoute(DEFAULT_QUESTIONS,route).length>=10,`${routeId} needs a usable starter bank`);
+    const minimum=routeId==='java-backend'?250:70;
+    assert.ok(questionsForRoute(DEFAULT_QUESTIONS,route).length>=minimum,`${routeId} needs at least ${minimum} curated cards`);
   }
   for(const routeId of ['junior-foundation','mid-engineering','senior-architecture']){
     const route=LEARNING_ROUTES.find(item=>item.id===routeId)!;
@@ -125,7 +126,8 @@ test('retention helpers create reports, calendars, estimates and safe streak fre
   const records=['2026-08-22','2026-08-24','2026-08-26'].map((date,index)=>({id:`r${index}`,questionId:DEFAULT_QUESTIONS[index].id,category:DEFAULT_QUESTIONS[index].category,score:70+index*10,rating:'good' as const,reviewedAt:`${date}T08:00:00.000Z`,durationSeconds:120}));
   const report=buildWeeklyReport(records,DEFAULT_QUESTIONS,now);assert.equal(report.activeDays,3);assert.equal(report.reviews,3);assert.equal(report.minutes,6);
   const calendar=learningCalendar(records,{},7,now);assert.equal(calendar.length,7);assert.equal(calendar.at(-1)?.completed,1);
-  const completion=estimateCompletion(DEFAULT_QUESTIONS,{},LEARNING_ROUTES.find(item=>item.id==='frontend')!,{...DEFAULT_SETTINGS,dailyNewLimit:5},now);assert.equal(completion.days,2);
+  const frontendRoute=LEARNING_ROUTES.find(item=>item.id==='frontend')!;
+  const completion=estimateCompletion(DEFAULT_QUESTIONS,{},frontendRoute,{...DEFAULT_SETTINGS,dailyNewLimit:5},now);assert.equal(completion.days,Math.ceil(questionsForRoute(DEFAULT_QUESTIONS,frontendRoute).length/5));
   const frozen=consumeStreakFreeze(DEFAULT_RETENTION,records,new Date('2026-08-28T08:00:00.000Z'));assert.equal(frozen?.streakFreezes,0);assert.deepEqual(frozen?.freezeDates,['2026-08-27']);
   assert.equal(reviewStreak(records,new Date('2026-08-28T08:00:00.000Z'),['2026-08-27']),2);
 });
