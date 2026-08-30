@@ -1,9 +1,11 @@
 import { JAVA_QUESTION_BANK } from '../data/java-bank.ts';
 import { CAREER_QUESTION_BANK } from '../data/career-bank.ts';
 import { EXPANDED_QUESTION_BANK } from '../data/expanded-bank.ts';
+import { Rating as FsrsRating, State as FsrsState, createEmptyCard, fsrs, type Card as FsrsCard, type Grade as FsrsGrade } from 'ts-fsrs';
 
 export type Rating = 'again' | 'hard' | 'good' | 'easy';
 export type CareerLevel = 'junior' | 'mid' | 'senior';
+export type SiblingKind = 'core' | 'mechanism' | 'boundary' | 'diagnosis' | 'practice';
 
 export type Question = {
   id: string;
@@ -26,6 +28,10 @@ export type Question = {
   source?: string;
   suspended?: boolean;
   buriedUntil?: string;
+  topicId?: string;
+  topicTitle?: string;
+  siblingKind?: SiblingKind;
+  siblingOrder?: number;
 };
 
 export type QuestionProgress = {
@@ -40,6 +46,9 @@ export type QuestionProgress = {
   state?: 'new' | 'learning' | 'review' | 'relearning';
   lapses?: number;
   lastReviewedAt?: string;
+  scheduledDays?: number;
+  elapsedDays?: number;
+  learningSteps?: number;
 };
 
 export type Progress = Record<string, QuestionProgress>;
@@ -69,6 +78,7 @@ export type ReviewRecord = {
 export type Settings = {
   dailyGoal:number; dailyNewLimit:number; targetRetention:number; reminderTime:string; notifications:boolean;
   model:string; dailyAiLimit:number; selectedRoute:string; compactMobile:boolean; adaptiveDailyGoal:boolean; weeklyGoal:number; targetDate:string;
+  interviewPlanEnabled:boolean; interviewFinalReviewDays:number; dailyMinutes:number;
   prompts:PromptTemplates;
 };
 
@@ -87,9 +97,9 @@ export type InterviewReport = { id:string; role:string; questionIds:string[]; sc
 export type InterviewRetrospective={id:string;createdAt:string;role:string;summary:string;overallFeedback:string;strengths:string[];weaknesses:string[];topics:{name:string;category:string;evidence:string;priority:'high'|'medium'|'low'}[];actionPlan:string[];questionIds:string[];transcriptPreview:string;source:'ai'|'local';model?:string};
 export type RetentionState={ streakFreezes:number; freezeDates:string[]; lastWeeklyReportAt?:string };
 export type LearningRoute={id:string;name:string;description:string;categories:string[];roleIds?:string[];levels?:CareerLevel[];companyTags?:string[];directionTags?:string[];questionIds?:string[];source?:'built-in'|'jd'|'custom'|'interview';createdAt?:string;updatedAt?:string};
-export type AppSnapshot = { version:6; questions:Question[]; progress:Progress; history:ReviewRecord[]; settings:Settings; interviewReports:InterviewReport[]; interviewRetrospectives:InterviewRetrospective[]; customRoutes:LearningRoute[]; retention:RetentionState };
+export type AppSnapshot = { version:7; questions:Question[]; progress:Progress; history:ReviewRecord[]; settings:Settings; interviewReports:InterviewReport[]; interviewRetrospectives:InterviewRetrospective[]; customRoutes:LearningRoute[]; retention:RetentionState };
 export const DEFAULT_RETENTION:RetentionState={streakFreezes:1,freezeDates:[]};
-export const DEFAULT_SETTINGS:Settings={ dailyGoal:20,dailyNewLimit:5,targetRetention:.9,reminderTime:'20:00',notifications:false,model:'gpt-4.1-mini',dailyAiLimit:30,selectedRoute:'java-backend',compactMobile:false,adaptiveDailyGoal:true,weeklyGoal:5,targetDate:'',prompts:DEFAULT_PROMPTS };
+export const DEFAULT_SETTINGS:Settings={ dailyGoal:20,dailyNewLimit:5,targetRetention:.9,reminderTime:'20:00',notifications:false,model:'gpt-4.1-mini',dailyAiLimit:30,selectedRoute:'java-backend',compactMobile:false,adaptiveDailyGoal:true,weeklyGoal:5,targetDate:'',interviewPlanEnabled:false,interviewFinalReviewDays:4,dailyMinutes:30,prompts:DEFAULT_PROMPTS };
 const JAVA_BACKEND_CATEGORIES=['Java 基础','面向对象','集合框架','Java IO','Java 新特性','JVM','Java 并发','Spring','Spring Boot','MyBatis','数据库','Redis','消息队列','分布式','系统设计'];
 export const LEARNING_ROUTES:LearningRoute[]=[
   { id:'java-backend',name:'Java 后端核心词书',description:'按基础、JVM、框架、数据与分布式逐步引入新知识',categories:JAVA_BACKEND_CATEGORIES,source:'built-in' },
@@ -132,34 +142,42 @@ export function createId(prefix = 'q') {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
 }
 
+const FSRS_RATINGS:Record<Rating,FsrsGrade>={again:FsrsRating.Again,hard:FsrsRating.Hard,good:FsrsRating.Good,easy:FsrsRating.Easy};
+const FSRS_STATES:Record<NonNullable<QuestionProgress['state']>,FsrsState>={new:FsrsState.New,learning:FsrsState.Learning,review:FsrsState.Review,relearning:FsrsState.Relearning};
+const APP_STATES:Record<FsrsState,NonNullable<QuestionProgress['state']>>={0:'new',1:'learning',2:'review',3:'relearning'};
+
+function toFsrsCard(previous:QuestionProgress|undefined,now=new Date()):FsrsCard {
+  if(!previous)return createEmptyCard(now);
+  const interval=Math.max(0,previous.interval||0);const due=new Date(previous.nextReview);const fallbackLast=new Date(due.getTime()-interval*86400000);const lastReview=previous.lastReviewedAt?new Date(previous.lastReviewedAt):fallbackLast;
+  return {due:Number.isNaN(due.getTime())?now:due,stability:Math.max(.01,previous.stability??interval??.01),difficulty:Math.max(1,Math.min(10,previous.difficulty??5)),elapsed_days:previous.elapsedDays??Math.max(0,Math.round((now.getTime()-lastReview.getTime())/86400000)),scheduled_days:previous.scheduledDays??Math.max(0,Math.round(interval)),learning_steps:previous.learningSteps??0,reps:previous.reviews||0,lapses:previous.lapses||0,state:FSRS_STATES[previous.state||'review'],last_review:lastReview};
+}
+
 export function scheduleReview(question: Question, previous: QuestionProgress | undefined, rating: Rating, score: number, now = new Date(), targetRetention=.9): QuestionProgress {
-  const reviews = previous?.reviews ?? 0;
-  const oldEase = previous?.ease ?? 2.5;
-  const oldStability=previous?.stability ?? Math.max(.4,previous?.interval ?? 1);
-  const oldDifficulty=previous?.difficulty ?? Math.max(1,Math.min(10,7-question.difficulty));
-  const elapsed=previous?.lastReviewedAt ? Math.max(0,(now.getTime()-new Date(previous.lastReviewedAt).getTime())/86400000) : 0;
-  const retrievability=Math.exp(Math.log(.9)*elapsed/Math.max(.2,oldStability));
-  const growth:Record<Rating,number>={again:.45,hard:1.18+(1-retrievability)*.25,good:1.85+(1-retrievability)*1.4,easy:2.65+(1-retrievability)*2};
-  const initial:Record<Rating,number>={again:10/1440,hard:1,good:3,easy:7};
-  const stability=reviews===0 ? initial[rating] : Math.max(10/1440,oldStability*growth[rating]*(.92+score/1000));
-  const retention=Math.max(.8,Math.min(.97,targetRetention));
-  const interval=rating==='again' ? 10/1440 : reviews===0 ? initial[rating] : Math.max(1,Math.round(stability*Math.log(retention)/Math.log(.9)));
-  const easeDelta = { again:-.2, hard:-.08, good:.04, easy:.14 }[rating];
+  const scheduler=fsrs({request_retention:Math.max(.8,Math.min(.97,targetRetention)),enable_fuzz:false,enable_short_term:true,learning_steps:['10m','1d'],relearning_steps:['10m']});
+  const {card}=scheduler.next(toFsrsCard(previous,now),now,FSRS_RATINGS[rating]);const interval=Math.max(1/1440,(card.due.getTime()-now.getTime())/86400000);
   const strengthDelta = { again:-14, hard:3, good:10, easy:18 }[rating] + Math.round((score - 70) / 15);
   return {
     strength:Math.max(5, Math.min(100, (previous?.strength ?? question.strength) + strengthDelta)),
     interval,
-    ease:Math.max(1.3, Math.min(3.2, oldEase + easeDelta)),
-    nextReview:new Date(now.getTime() + interval * 86400000).toISOString(),
-    reviews:reviews + 1,
+    ease:Math.max(1.3,Math.min(3.2,3.3-card.difficulty*.2)),
+    nextReview:card.due.toISOString(),
+    reviews:card.reps,
     lastScore:score,
-    stability,
-    difficulty:Math.max(1,Math.min(10,oldDifficulty+({again:.8,hard:.25,good:-.15,easy:-.45}[rating]))),
-    state:rating==='again'?(reviews?'relearning':'learning'):'review',
-    lapses:(previous?.lapses??0)+(rating==='again'?1:0),
+    stability:card.stability,
+    difficulty:card.difficulty,
+    state:APP_STATES[card.state],
+    lapses:card.lapses,
     lastReviewedAt:now.toISOString(),
+    scheduledDays:card.scheduled_days,
+    elapsedDays:card.elapsed_days,
+    learningSteps:card.learning_steps,
   };
 }
+
+export function questionTopicId(question:Question){return question.topicId||question.id;}
+export type QuestionTopic={id:string;title:string;category:string;questions:Question[]};
+export function groupQuestionTopics(questions:Question[]):QuestionTopic[]{const groups=new Map<string,QuestionTopic>();for(const question of questions){const id=questionTopicId(question);const current=groups.get(id);if(current)current.questions.push(question);else groups.set(id,{id,title:question.topicTitle||question.title,category:question.category,questions:[question]});}return [...groups.values()].map(topic=>({...topic,questions:topic.questions.slice().sort((a,b)=>(a.siblingOrder??0)-(b.siblingOrder??0))}));}
+function uniqueByTopic(questions:Question[]){const seen=new Set<string>();return questions.filter(question=>{const id=questionTopicId(question);if(seen.has(id))return false;seen.add(id);return true;});}
 
 export function dueQuestions(questions: Question[], progress: Progress, now = new Date()) {
   return [...questions].filter(question => isCardAvailable(question,now)&&(!progress[question.id] || new Date(progress[question.id].nextReview) <= now)).sort((a,b) => {
@@ -193,17 +211,27 @@ export function buildDailyQueue(questions:Question[],progress:Progress,history:R
   const firstReview=new Map<string,ReviewRecord>();
   for(const record of history){const current=firstReview.get(record.questionId);if(!current||record.reviewedAt<current.reviewedAt)firstReview.set(record.questionId,record);}
   const todayRecords=history.filter(record=>localDateKey(new Date(record.reviewedAt))===today);
+  const questionById=new Map(questions.map(question=>[question.id,question]));
+  const reviewedTopics=new Set(todayRecords.map(record=>questionById.get(record.questionId)).filter((question):question is Question=>Boolean(question)).map(questionTopicId));
   const newCompleted=todayRecords.filter(record=>firstReview.get(record.questionId)?.id===record.id).length;
   const reviewCompleted=Math.max(0,todayRecords.length-newCompleted);
-  const dueReviews=dueQuestions(questions.filter(question=>progress[question.id]),progress,now);
+  const dueReviews=uniqueByTopic(dueQuestions(questions.filter(question=>progress[question.id]&&!reviewedTopics.has(questionTopicId(question))),progress,now));
   const adaptive=adaptiveDailyLimits(history,settings,now);
-  const remainingReviewLimit=Math.max(0,adaptive.reviewLimit-reviewCompleted);
-  const reviews=dueReviews.slice(0,remainingReviewLimit);
+  const interviewPlan=buildInterviewStudyPlan(questions,progress,route,settings,now);
+  const plannedReviewLimit=settings.interviewPlanEnabled&&interviewPlan.active?interviewPlan.dailyReviewTarget:adaptive.reviewLimit;
+  const remainingReviewLimit=Math.max(0,plannedReviewLimit-reviewCompleted);
+  let reviews=dueReviews.slice(0,remainingReviewLimit);
   const reviewBacklog=Math.max(0,dueReviews.length-reviews.length);
   const routeQuestions=questionsForRoute(questions,route);
-  const newQuestions=routeQuestions.filter(question=>isCardAvailable(question,now)&&!progress[question.id]);
-  const remainingNewLimit=reviewBacklog?0:Math.max(0,adaptive.newLimit-newCompleted);
+  const newQuestions=uniqueByTopic(routeQuestions.filter(question=>isCardAvailable(question,now)&&!progress[question.id]&&!reviewedTopics.has(questionTopicId(question))));
+  const plannedNewLimit=settings.interviewPlanEnabled&&interviewPlan.active?interviewPlan.dailyNewTarget:adaptive.newLimit;
+  const remainingNewLimit=reviewBacklog?0:Math.max(0,plannedNewLimit-newCompleted);
   const newCards=newQuestions.slice(0,remainingNewLimit);
+  if(settings.interviewPlanEnabled&&interviewPlan.phase==='final-review'&&reviews.length<remainingReviewLimit){
+    const usedTopics=new Set(reviews.map(questionTopicId));
+    const finalReview=uniqueByTopic(routeQuestions.filter(question=>progress[question.id]&&!reviewedTopics.has(questionTopicId(question))&&!usedTopics.has(questionTopicId(question))&&!dueReviews.some(item=>item.id===question.id)).sort((a,b)=>(estimatedRecall(progress[a.id],now)??101)-(estimatedRecall(progress[b.id],now)??101))).slice(0,remainingReviewLimit-reviews.length);
+    reviews=[...reviews,...finalReview];
+  }
   return {questions:[...reviews,...newCards],reviewScheduled:reviews.length,newScheduled:newCards.length,reviewCompleted,newCompleted,reviewBacklog,newAvailable:newQuestions.length};
 }
 
@@ -236,6 +264,25 @@ export function estimateCompletion(questions:Question[],progress:Progress,route:
   return{remaining,days,date:localDateKey(target)};
 }
 
+export type InterviewPlanPhase='learning'|'catch-up'|'final-review'|'interview-day'|'expired'|'complete';
+export type InterviewStudyPlan={active:boolean;phase:InterviewPlanPhase;daysRemaining:number;studyDaysRemaining:number;remainingNew:number;overdue:number;dailyNewTarget:number;dailyReviewTarget:number;projectedMinutes:number;onTrack:boolean;finalReviewStartsAt:string;message:string};
+export function buildInterviewStudyPlan(questions:Question[],progress:Progress,route:LearningRoute,settings:Settings,now=new Date()):InterviewStudyPlan {
+  const scoped=questionsForRoute(questions,route);const remainingNew=scoped.filter(question=>!progress[question.id]).length;const overdue=scoped.filter(question=>progress[question.id]&&new Date(progress[question.id].nextReview)<=now).length;
+  const target=settings.targetDate?new Date(`${settings.targetDate}T12:00:00`):null;const valid=Boolean(target&&!Number.isNaN(target.getTime()));
+  const daysRemaining=valid?Math.ceil((target!.getTime()-new Date(now.getFullYear(),now.getMonth(),now.getDate(),12).getTime())/86400000):0;
+  const finalDays=Math.max(2,Math.min(7,settings.interviewFinalReviewDays||4));const studyDaysRemaining=Math.max(0,daysRemaining-finalDays);const dailyNewTarget=remainingNew?Math.ceil(remainingNew/Math.max(1,studyDaysRemaining)):0;
+  const learnedCount=scoped.length-remainingNew;const baseReview=Math.max(overdue,Math.ceil(learnedCount*(1-settings.targetRetention)/7));const dailyReviewTarget=Math.min(150,Math.max(settings.dailyGoal,baseReview+(daysRemaining<=finalDays?Math.ceil(learnedCount/Math.max(1,daysRemaining)):0)));const rawProjectedMinutes=Math.ceil(dailyNewTarget*5+dailyReviewTarget*3);
+  const phase:InterviewPlanPhase=!valid?'learning':remainingNew===0&&overdue===0?'complete':daysRemaining<0?'expired':daysRemaining===0?'interview-day':daysRemaining<=finalDays?'final-review':(dailyNewTarget>settings.dailyNewLimit||overdue>settings.dailyGoal||rawProjectedMinutes>settings.dailyMinutes)?'catch-up':'learning';
+  const effectiveNew=phase==='final-review'||phase==='interview-day'||phase==='expired'?0:dailyNewTarget;const projectedMinutes=Math.max(0,Math.ceil(effectiveNew*5+dailyReviewTarget*3));const onTrack=valid&&phase!=='expired'&&dailyNewTarget<=Math.max(1,settings.dailyNewLimit)&&overdue<=settings.dailyGoal&&projectedMinutes<=settings.dailyMinutes;const finalDate=valid?new Date(target!.getTime()-finalDays*86400000):now;
+  const messages:Record<InterviewPlanPhase,string>={learning:'按当前节奏推进新知识，并保留末段集中复习。','catch-up':'当前进度偏紧，计划已提高每日任务；先清理到期积压。','final-review':'已进入最终复习期：暂停新题，优先覆盖薄弱主题。','interview-day':'今天是面试日，只做轻量回忆，不再引入新题。',expired:'目标日期已过，请更新日期后重新生成计划。',complete:'当前词书已完成，保持到期复习即可。'};
+  return{active:valid,phase,daysRemaining,studyDaysRemaining,remainingNew,overdue,dailyNewTarget:effectiveNew,dailyReviewTarget,projectedMinutes,onTrack,finalReviewStartsAt:localDateKey(finalDate),message:messages[phase]};
+}
+
+export function buildWorkloadForecast(questions:Question[],progress:Progress,route:LearningRoute,settings:Settings,days=30,now=new Date()){
+  const plan=buildInterviewStudyPlan(questions,progress,route,settings,now);const scopedIds=new Set(questionsForRoute(questions,route).map(question=>question.id));
+  return Array.from({length:days},(_,index)=>{const date=new Date(now.getFullYear(),now.getMonth(),now.getDate());date.setDate(date.getDate()+index);const key=localDateKey(date);const review=Object.entries(progress).filter(([id,item])=>scopedIds.has(id)&&localDateKey(new Date(item.nextReview))===key).length;const fresh=plan.active&&index<plan.studyDaysRemaining?plan.dailyNewTarget:0;return{key,label:index%5===0?`${date.getMonth()+1}/${date.getDate()}`:'',review,new:fresh,total:review+fresh};});
+}
+
 export function learningCalendar(history:ReviewRecord[],progress:Progress,days=42,now=new Date()){
   return Array.from({length:days},(_,index)=>{const date=new Date(now.getFullYear(),now.getMonth(),now.getDate());date.setDate(date.getDate()-(days-1-index));const key=localDateKey(date);const completed=history.filter(item=>localDateKey(new Date(item.reviewedAt))===key).length;const due=Object.values(progress).filter(item=>localDateKey(new Date(item.nextReview))===key).length;return{key,date,completed,due};});
 }
@@ -246,11 +293,8 @@ export function consumeStreakFreeze(retention:RetentionState,history:ReviewRecor
 
 export function estimatedRecall(item:QuestionProgress|undefined,now=new Date()):number|null {
   if(!item)return null;
-  const stability=Math.max(.2,item.stability??item.interval??1);
-  const fallbackLast=new Date(new Date(item.nextReview).getTime()-Math.max(0,item.interval)*86400000);
-  const last=item.lastReviewedAt?new Date(item.lastReviewedAt):fallbackLast;
-  const elapsed=Math.max(0,(now.getTime()-last.getTime())/86400000);
-  return Math.max(1,Math.min(100,Math.round(Math.exp(Math.log(.9)*elapsed/stability)*100)));
+  const value=fsrs({enable_fuzz:false}).get_retrievability(toFsrsCard(item,now),now,false);
+  return Math.max(1,Math.min(100,Math.round(value*100)));
 }
 
 export function isMastered(item:QuestionProgress|undefined) {
@@ -288,7 +332,7 @@ export function safeParse<T>(value: string | null, fallback: T): T {
 export function normalizeQuestion(question:Question):Question {
   const levels:CareerLevel[]=Array.isArray(question.levels)&&question.levels.length?question.levels:[question.difficulty===1?'junior':question.difficulty===2?'mid':'senior'];
   const companyTags=Array.isArray(question.companyTags)?question.companyTags:question.difficulty===3?['大厂通用']:(['数据库','Redis','消息队列','分布式'].includes(question.category)?['金融高可用']:['创业全栈']);
-  return { ...question,tags:Array.isArray(question.tags)?question.tags:[],favorite:Boolean(question.favorite),routeIds:Array.isArray(question.routeIds)?question.routeIds:[],roleIds:Array.isArray(question.roleIds)?question.roleIds:question.id.startsWith('java-')?['java-backend']:[],levels,companyTags,directionTags:Array.isArray(question.directionTags)?question.directionTags:[],prerequisites:Array.isArray(question.prerequisites)?question.prerequisites:[],bankVersion:question.bankVersion||1,source:question.source||'手动',suspended:Boolean(question.suspended),buriedUntil:question.buriedUntil||undefined };
+  return { ...question,tags:Array.isArray(question.tags)?question.tags:[],favorite:Boolean(question.favorite),routeIds:Array.isArray(question.routeIds)?question.routeIds:[],roleIds:Array.isArray(question.roleIds)?question.roleIds:question.id.startsWith('java-')?['java-backend']:[],levels,companyTags,directionTags:Array.isArray(question.directionTags)?question.directionTags:[],prerequisites:Array.isArray(question.prerequisites)?question.prerequisites:[],bankVersion:question.bankVersion||1,source:question.source||'手动',suspended:Boolean(question.suspended),buriedUntil:question.buriedUntil||undefined,topicId:question.topicId||question.id,topicTitle:question.topicTitle||question.title,siblingOrder:question.siblingOrder??0 };
 }
 
 export function isCardAvailable(question:Question,now=new Date()){
@@ -296,7 +340,7 @@ export function isCardAvailable(question:Question,now=new Date()){
 }
 
 export function createSnapshot(questions:Question[],progress:Progress,history:ReviewRecord[],settings:Settings,interviewReports:InterviewReport[],customRoutes:LearningRoute[]=[],retention:RetentionState=DEFAULT_RETENTION,interviewRetrospectives:InterviewRetrospective[]=[]):AppSnapshot {
-  return {version:6,questions:questions.map(normalizeQuestion),progress,history,settings:{...DEFAULT_SETTINGS,...settings,prompts:{...DEFAULT_PROMPTS,...settings.prompts}},interviewReports,interviewRetrospectives,customRoutes,retention:{...DEFAULT_RETENTION,...retention,freezeDates:[...(retention.freezeDates||[])]}};
+  return {version:7,questions:questions.map(normalizeQuestion),progress,history,settings:{...DEFAULT_SETTINGS,...settings,prompts:{...DEFAULT_PROMPTS,...settings.prompts}},interviewReports,interviewRetrospectives,customRoutes,retention:{...DEFAULT_RETENTION,...retention,freezeDates:[...(retention.freezeDates||[])]}};
 }
 
 export function mergeBuiltInQuestions(questions:Question[]) {

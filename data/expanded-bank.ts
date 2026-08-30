@@ -15,11 +15,11 @@ type Topic = {
 };
 
 const cardKinds = [
-  { title:(name:string)=>`${name}是什么，主要解决什么问题？`, hint:'先说清定义与目标，再补充核心机制和实际价值。', fields:['definition','mechanism','boundary'] as const },
-  { title:(name:string)=>`${name}的核心工作机制是什么？`, hint:'按关键组件、执行流程和结果保证来回答。', fields:['mechanism','definition','practice'] as const },
-  { title:(name:string)=>`${name}适合哪些场景，有什么边界？`, hint:'同时说明适用条件、收益、成本和不适用场景。', fields:['boundary','definition','failure'] as const },
-  { title:(name:string)=>`${name}常见故障或误用有哪些，如何排查？`, hint:'从现象、证据、根因和止损顺序组织回答。', fields:['failure','mechanism','practice'] as const },
-  { title:(name:string)=>`在真实项目中如何正确落地${name}？`, hint:'给出设计步骤、验证指标、异常处理和回滚方案。', fields:['practice','boundary','failure'] as const },
+  { kind:'core' as const,title:(name:string)=>`${name}是什么，主要解决什么问题？`, hint:'先说清定义与目标，再补充核心机制和实际价值。', fields:['definition','mechanism','boundary'] as const },
+  { kind:'mechanism' as const,title:(name:string)=>`${name}的核心工作机制是什么？`, hint:'按关键组件、执行流程和结果保证来回答。', fields:['mechanism','definition','practice'] as const },
+  { kind:'boundary' as const,title:(name:string)=>`${name}适合哪些场景，有什么边界？`, hint:'同时说明适用条件、收益、成本和不适用场景。', fields:['boundary','definition','failure'] as const },
+  { kind:'diagnosis' as const,title:(name:string)=>`${name}常见故障或误用有哪些，如何排查？`, hint:'从现象、证据、根因和止损顺序组织回答。', fields:['failure','mechanism','practice'] as const },
+  { kind:'practice' as const,title:(name:string)=>`在真实项目中如何正确落地${name}？`, hint:'给出设计步骤、验证指标、异常处理和回滚方案。', fields:['practice','boundary','failure'] as const },
 ];
 
 function expand(topics:Topic[]):Question[]{
@@ -42,6 +42,10 @@ function expand(topics:Topic[]):Question[]{
       prerequisites:[],
       bankVersion:2,
       source:'权威文档校准题库 v2',
+      topicId:`kb-${topic.prefix}-${String(topicIndex+1).padStart(2,'0')}`,
+      topicTitle:topic.name,
+      siblingKind:kind.kind,
+      siblingOrder:cardIndex,
     };
   }));
 }

@@ -1,22 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { safeAuthUrl, safeEqual } from './auth-policy.ts';
-import { DEFAULT_QUESTIONS, DEFAULT_RETENTION, DEFAULT_SETTINGS, LEARNING_ROUTES, adaptiveDailyLimits, buildDailyQueue, buildWeeklyReport, consumeStreakFreeze, createSnapshot, dueQuestions, estimateCompletion, estimatedRecall, isCardAvailable, learningCalendar, mergeBuiltInQuestions, parseImportedCards, questionsForRoute, reviewStreak, scheduleReview } from './model.ts';
+import { DEFAULT_QUESTIONS, DEFAULT_RETENTION, DEFAULT_SETTINGS, LEARNING_ROUTES, adaptiveDailyLimits, buildDailyQueue, buildInterviewStudyPlan, buildWeeklyReport, consumeStreakFreeze, createSnapshot, dueQuestions, estimateCompletion, estimatedRecall, groupQuestionTopics, isCardAvailable, learningCalendar, mergeBuiltInQuestions, normalizeQuestion, parseImportedCards, questionsForRoute, reviewStreak, scheduleReview } from './model.ts';
 
 const now = new Date('2026-08-26T08:00:00.000Z');
 const question = DEFAULT_QUESTIONS[0];
 
 test('new cards receive increasing intervals by rating', () => {
-  assert.equal(scheduleReview(question, undefined, 'again', 60, now).interval, 10 / 1440);
-  assert.equal(scheduleReview(question, undefined, 'hard', 70, now).interval, 1);
-  assert.equal(scheduleReview(question, undefined, 'good', 80, now).interval, 3);
-  assert.equal(scheduleReview(question, undefined, 'easy', 90, now).interval, 7);
+  const intervals=(['again','hard','good','easy'] as const).map(rating=>scheduleReview(question,undefined,rating,80,now).interval);
+  assert.deepEqual(intervals,[10/1440,145/288,1,8]);
+  assert.ok(intervals.every((value,index)=>index===0||value>intervals[index-1]));
 });
 
 test('scheduled cards disappear until their review time', () => {
   const item = scheduleReview(question, undefined, 'good', 85, now);
-  assert.equal(dueQuestions([question], { [question.id]:item }, new Date('2026-08-27T08:00:00.000Z')).length, 0);
-  assert.equal(dueQuestions([question], { [question.id]:item }, new Date('2026-08-30T08:00:00.000Z')).length, 1);
+  assert.equal(dueQuestions([question], { [question.id]:item }, new Date('2026-08-26T20:00:00.000Z')).length, 0);
+  assert.equal(dueQuestions([question], { [question.id]:item }, new Date('2026-08-27T08:00:00.000Z')).length, 1);
 });
 
 test('streak includes consecutive days and tolerates no review today', () => {
@@ -69,7 +68,7 @@ test('routes order new knowledge and recall is derived from personal timing data
   const route=LEARNING_ROUTES.find(item=>item.id==='jvm-concurrency')!;
   assert.ok(questionsForRoute(DEFAULT_QUESTIONS,route).every(item=>['JVM','Java 并发'].includes(item.category)));
   const item=scheduleReview(question,undefined,'good',80,now);
-  assert.equal(estimatedRecall(item,new Date('2026-08-29T08:00:00.000Z')),90);
+  const recall=estimatedRecall(item,new Date('2026-08-29T08:00:00.000Z'));assert.ok(recall!==null&&recall<90&&recall>80);
   assert.equal(estimatedRecall(undefined,now),null);
 });
 
@@ -117,11 +116,29 @@ test('career bank covers six roles plus junior, mid and senior routes', () => {
   }
 });
 
-test('snapshot v6 preserves word books, prompts, retrospectives and upgraded metadata', () => {
+test('snapshot v7 preserves word books, prompts, retrospectives and upgraded metadata', () => {
   const customRoute={id:'jd-test',name:'JD 测试',description:'岗位路线',categories:[],questionIds:[question.id],source:'jd' as const};
   const retrospective={id:'retro-1',createdAt:'2026-08-28T00:00:00.000Z',role:'Java 后端',summary:'复盘完成',overallFeedback:'继续补强事务',strengths:['表达清楚'],weaknesses:['事务隔离'],topics:[],actionPlan:['复习'],questionIds:[question.id],transcriptPreview:'面试文字稿摘要',source:'ai' as const};
   const snapshot=createSnapshot([question],{},[],DEFAULT_SETTINGS,[],[customRoute],{streakFreezes:0,freezeDates:['2026-08-25']},[retrospective]);
-  assert.equal(snapshot.version,6);assert.equal(snapshot.customRoutes[0].id,'jd-test');assert.equal(snapshot.interviewRetrospectives[0].id,'retro-1');assert.ok(snapshot.settings.prompts.interviewReview.includes('{transcript}'));assert.deepEqual(snapshot.retention.freezeDates,['2026-08-25']);assert.ok(snapshot.questions[0].levels?.length);
+  assert.equal(snapshot.version,7);assert.equal(snapshot.customRoutes[0].id,'jd-test');assert.equal(snapshot.interviewRetrospectives[0].id,'retro-1');assert.ok(snapshot.settings.prompts.interviewReview.includes('{transcript}'));assert.deepEqual(snapshot.retention.freezeDates,['2026-08-25']);assert.ok(snapshot.questions[0].levels?.length);
+});
+
+test('question bank groups 643 cards into 299 topics with five-card related sets',()=>{
+  const topics=groupQuestionTopics(DEFAULT_QUESTIONS.map(normalizeQuestion));
+  assert.equal(topics.length,299);assert.equal(topics.filter(topic=>topic.questions.length===5).length,86);
+  assert.ok(topics.filter(topic=>topic.questions.length===5).every(topic=>new Set(topic.questions.map(card=>card.siblingKind)).size===5));
+});
+
+test('daily queue spaces related cards and buries siblings after one topic review',()=>{
+  const topic=groupQuestionTopics(DEFAULT_QUESTIONS.map(normalizeQuestion)).find(item=>item.questions.length===5)!;const route={id:'topic-test',name:'主题测试',description:'',categories:[],questionIds:topic.questions.map(card=>card.id)};
+  const first=buildDailyQueue(topic.questions,{},[],{...DEFAULT_SETTINGS,dailyNewLimit:5},route,now);assert.equal(first.newScheduled,1);
+  const record={id:'topic-review',questionId:topic.questions[0].id,category:topic.category,score:80,rating:'good' as const,reviewedAt:now.toISOString()};
+  const after=buildDailyQueue(topic.questions,{[topic.questions[0].id]:scheduleReview(topic.questions[0],undefined,'good',80,now)},[record],{...DEFAULT_SETTINGS,dailyNewLimit:5},route,now);assert.equal(after.questions.length,0);
+});
+
+test('interview plan switches between catch-up and final review phases',()=>{
+  const route=LEARNING_ROUTES.find(item=>item.id==='frontend')!;const catchUp=buildInterviewStudyPlan(DEFAULT_QUESTIONS,{},route,{...DEFAULT_SETTINGS,targetDate:'2026-09-09',interviewPlanEnabled:true,dailyNewLimit:2},now);assert.equal(catchUp.phase,'catch-up');assert.ok(catchUp.dailyNewTarget>2);
+  const final=buildInterviewStudyPlan(DEFAULT_QUESTIONS,{},route,{...DEFAULT_SETTINGS,targetDate:'2026-08-29',interviewPlanEnabled:true},now);assert.equal(final.phase,'final-review');assert.equal(final.dailyNewTarget,0);
 });
 
 test('retention helpers create reports, calendars, estimates and safe streak freezes', () => {
