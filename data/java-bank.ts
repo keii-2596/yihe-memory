@@ -168,12 +168,18 @@ const seeds:Seed[]=[
   ['系统设计','线上 Java 服务频繁 Full GC 如何排查？','确认收集器与 GC 原因|看分配率 晋升率与堆占用|检查大对象和内存泄漏|分析 GC 日志与 heap dump|不要先盲目调大堆','先判断 Full GC 是元空间、显式 GC、晋升失败还是老年代增长。结合 GC 日志、对象直方图和堆转储定位异常保留或分配；调参必须基于根因与停顿目标。',3,'排障,GC'],
 ];
 
+function detailedReference(category:string,title:string,points:string,reference:string){
+  const keyPoints=points.split('|');
+  const approach=title.includes('区别')||title.includes('比较')?'比较类问题应使用同一组维度逐项说明，例如定义、实现机制、性能代价和适用场景，避免只罗列名词。':title.includes('为什么')?'原因类问题应先给结论，再解释因果链，最后说明结论成立的前提和例外。':title.includes('如何')||title.includes('怎么')?'方案类问题应按目标、关键步骤、异常处理和验证方式组织，避免只回答工具名称。':'概念类问题应先说明它是什么，再解释如何工作，最后补充使用场景、限制和常见误区。';
+  return `核心结论\n${reference}\n\n关键点拆解\n${keyPoints.map((point,index)=>`${index+1}. ${point}`).join('\n')}\n\n理解与作答\n这是一道“${category}”知识题。${approach}`;
+}
+
 export const JAVA_QUESTION_BANK:Question[]=seeds.map(([category,title,points,reference,difficulty,tags],index)=>({
   id:`java-${String(index+1).padStart(3,'0')}`,
   category,title,
   hint:'建议按“定义或结论 → 核心原理 → 使用场景与边界”组织回答。',
-  keyPoints:points.split('|'),reference,difficulty,strength:20,
+  keyPoints:points.split('|'),reference:detailedReference(category,title,points,reference),difficulty,strength:20,
   tags:['Java 八股',category,...(tags?tags.split(','):[])],favorite:false,
   routeIds:['java-backend'],roleIds:['java-backend'],levels:[difficulty===1?'junior':difficulty===2?'mid':'senior'],
-  directionTags:['Java 后端'],prerequisites:[],bankVersion:2,source:'内置 Java 知识库 v2',
+  directionTags:['Java 后端'],prerequisites:[],bankVersion:3,source:'内置 Java 知识库 v3',
 }));

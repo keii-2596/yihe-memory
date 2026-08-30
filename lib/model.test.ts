@@ -79,12 +79,12 @@ test('CSV and Markdown can be imported as cards', () => {
   assert.equal(markdown.length,1); assert.equal(markdown[0].keyPoints.length,2);
 });
 
-test('built-in Java bank is complete and structurally valid', () => {
+test('built-in interview bank is complete, detailed and structurally valid', () => {
   assert.ok(DEFAULT_QUESTIONS.length>=600&&DEFAULT_QUESTIONS.length<=800);
   assert.equal(new Set(DEFAULT_QUESTIONS.map(item=>item.id)).size,DEFAULT_QUESTIONS.length);
   assert.equal(new Set(DEFAULT_QUESTIONS.map(item=>item.title)).size,DEFAULT_QUESTIONS.length);
   for(const item of DEFAULT_QUESTIONS){
-    assert.ok(item.category); assert.ok(item.title); assert.ok(item.hint); assert.ok(item.reference.length>=20,`${item.id} needs a useful reference answer`);
+    assert.ok(item.category); assert.ok(item.title); assert.ok(item.hint); assert.ok(item.reference.length>=120,`${item.id} needs a detailed reference answer`);
     assert.ok(item.keyPoints.length>=3,`${item.id} needs at least 3 key points`);
     assert.ok([1,2,3].includes(item.difficulty));
     assert.ok(item.roleIds?.length,`${item.id} needs a role`);
@@ -104,6 +104,16 @@ test('bank migration preserves custom cards and existing edits without duplicate
   assert.equal(merged.length,DEFAULT_QUESTIONS.length+1);
 });
 
+test('bank migration refreshes older official answers while preserving card state', () => {
+  const current=DEFAULT_QUESTIONS[0];
+  const old={...current,reference:'旧版简短答案',bankVersion:2,source:'内置 Java 知识库 v2',favorite:true,suspended:true};
+  const refreshed=mergeBuiltInQuestions([old]).find(item=>item.id===old.id)!;
+  assert.equal(refreshed.reference,current.reference);
+  assert.equal(refreshed.bankVersion,3);
+  assert.equal(refreshed.favorite,true);
+  assert.equal(refreshed.suspended,true);
+});
+
 test('career bank covers six roles plus junior, mid and senior routes', () => {
   for(const routeId of ['java-backend','frontend','go-backend','python-backend','qa','devops']){
     const route=LEARNING_ROUTES.find(item=>item.id===routeId)!;
@@ -116,11 +126,11 @@ test('career bank covers six roles plus junior, mid and senior routes', () => {
   }
 });
 
-test('snapshot v7 preserves word books, prompts, retrospectives and upgraded metadata', () => {
+test('snapshot v8 preserves word books, prompts, retrospectives and upgraded metadata', () => {
   const customRoute={id:'jd-test',name:'JD 测试',description:'岗位路线',categories:[],questionIds:[question.id],source:'jd' as const};
   const retrospective={id:'retro-1',createdAt:'2026-08-28T00:00:00.000Z',role:'Java 后端',summary:'复盘完成',overallFeedback:'继续补强事务',strengths:['表达清楚'],weaknesses:['事务隔离'],topics:[],actionPlan:['复习'],questionIds:[question.id],transcriptPreview:'面试文字稿摘要',source:'ai' as const};
   const snapshot=createSnapshot([question],{},[],DEFAULT_SETTINGS,[],[customRoute],{streakFreezes:0,freezeDates:['2026-08-25']},[retrospective]);
-  assert.equal(snapshot.version,7);assert.equal(snapshot.customRoutes[0].id,'jd-test');assert.equal(snapshot.interviewRetrospectives[0].id,'retro-1');assert.ok(snapshot.settings.prompts.interviewReview.includes('{transcript}'));assert.deepEqual(snapshot.retention.freezeDates,['2026-08-25']);assert.ok(snapshot.questions[0].levels?.length);
+  assert.equal(snapshot.version,8);assert.equal(snapshot.customRoutes[0].id,'jd-test');assert.equal(snapshot.interviewRetrospectives[0].id,'retro-1');assert.ok(snapshot.settings.prompts.interviewReview.includes('{transcript}'));assert.deepEqual(snapshot.retention.freezeDates,['2026-08-25']);assert.ok(snapshot.questions[0].levels?.length);
 });
 
 test('question bank groups 643 cards into 299 topics with five-card related sets',()=>{

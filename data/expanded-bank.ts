@@ -15,11 +15,11 @@ type Topic = {
 };
 
 const cardKinds = [
-  { kind:'core' as const,title:(name:string)=>`${name}是什么，主要解决什么问题？`, hint:'先说清定义与目标，再补充核心机制和实际价值。', fields:['definition','mechanism','boundary'] as const },
-  { kind:'mechanism' as const,title:(name:string)=>`${name}的核心工作机制是什么？`, hint:'按关键组件、执行流程和结果保证来回答。', fields:['mechanism','definition','practice'] as const },
-  { kind:'boundary' as const,title:(name:string)=>`${name}适合哪些场景，有什么边界？`, hint:'同时说明适用条件、收益、成本和不适用场景。', fields:['boundary','definition','failure'] as const },
-  { kind:'diagnosis' as const,title:(name:string)=>`${name}常见故障或误用有哪些，如何排查？`, hint:'从现象、证据、根因和止损顺序组织回答。', fields:['failure','mechanism','practice'] as const },
-  { kind:'practice' as const,title:(name:string)=>`在真实项目中如何正确落地${name}？`, hint:'给出设计步骤、验证指标、异常处理和回滚方案。', fields:['practice','boundary','failure'] as const },
+  { kind:'core' as const,title:(name:string)=>`${name}是什么，主要解决什么问题？`, hint:'先说清定义与目标，再补充核心机制和实际价值。', fields:['definition','mechanism','boundary'] as const, reference:(topic:Topic)=>`核心结论\n${topic.definition}。\n\n工作原理\n${topic.mechanism}。这说明它并不是一个孤立名词，而是一套围绕明确目标组织起来的机制。\n\n适用边界\n${topic.boundary}。理解概念时要同时记住它能解决的问题和不能保证的事情。` },
+  { kind:'mechanism' as const,title:(name:string)=>`${name}的核心工作机制是什么？`, hint:'按关键组件、执行流程和结果保证来回答。', fields:['mechanism','definition','practice'] as const, reference:(topic:Topic)=>`核心机制\n${topic.mechanism}。\n\n为什么这样设计\n${topic.definition}。机制中的每一步都应服务于这个目标，回答时应说明输入如何经过关键环节得到结果。\n\n落地方式\n${topic.practice}。\n\n常见误区\n${topic.failure}。` },
+  { kind:'boundary' as const,title:(name:string)=>`${name}适合哪些场景，有什么边界？`, hint:'同时说明适用条件、收益、成本和不适用场景。', fields:['boundary','definition','failure'] as const, reference:(topic:Topic)=>`适用场景与边界\n${topic.boundary}。\n\n判断依据\n${topic.definition}。选择它之前，应先确认业务目标、数据或流量特征以及团队能否承担相应成本。\n\n主要风险\n${topic.failure}。\n\n实践建议\n${topic.practice}。` },
+  { kind:'diagnosis' as const,title:(name:string)=>`${name}常见故障或误用有哪些，如何排查？`, hint:'从现象、证据、根因和止损顺序组织回答。', fields:['failure','mechanism','practice'] as const, reference:(topic:Topic)=>`常见问题\n${topic.failure}。\n\n排查思路\n先确认现象、影响范围和最近变更，再对照正常机制定位偏差：${topic.mechanism}。不要一开始就改参数，应先用日志、指标或最小复现实验证明判断。\n\n处理与预防\n${topic.practice}。\n\n边界提醒\n${topic.boundary}。` },
+  { kind:'practice' as const,title:(name:string)=>`在真实项目中如何正确落地${name}？`, hint:'给出设计步骤、验证指标、异常处理和回滚方案。', fields:['practice','boundary','failure'] as const, reference:(topic:Topic)=>`落地目标\n${topic.definition}。\n\n实施步骤\n${topic.practice}。实施前应明确成功指标，实施中保留可观测信息，实施后用真实数据验证收益。\n\n实现依据\n${topic.mechanism}。\n\n风险与兜底\n${topic.failure}。\n\n适用边界\n${topic.boundary}。` },
 ];
 
 function expand(topics:Topic[]):Question[]{
@@ -31,7 +31,7 @@ function expand(topics:Topic[]):Question[]{
       title:kind.title(topic.name),
       hint:kind.hint,
       keyPoints,
-      reference:`${keyPoints.join('；')}。`,
+      reference:kind.reference(topic),
       difficulty:topic.level==='junior'?1:topic.level==='mid'?2:3,
       strength:20,
       tags:[topic.category,...topic.tags,topic.level==='junior'?'初级':topic.level==='mid'?'中级':'高级'],
@@ -40,8 +40,8 @@ function expand(topics:Topic[]):Question[]{
       levels:[topic.level],
       directionTags:topic.tags,
       prerequisites:[],
-      bankVersion:2,
-      source:'权威文档校准题库 v2',
+      bankVersion:3,
+      source:'权威文档校准题库 v3',
       topicId:`kb-${topic.prefix}-${String(topicIndex+1).padStart(2,'0')}`,
       topicTitle:topic.name,
       siblingKind:kind.kind,

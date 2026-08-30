@@ -97,7 +97,7 @@ export type InterviewReport = { id:string; role:string; questionIds:string[]; sc
 export type InterviewRetrospective={id:string;createdAt:string;role:string;summary:string;overallFeedback:string;strengths:string[];weaknesses:string[];topics:{name:string;category:string;evidence:string;priority:'high'|'medium'|'low'}[];actionPlan:string[];questionIds:string[];transcriptPreview:string;source:'ai'|'local';model?:string};
 export type RetentionState={ streakFreezes:number; freezeDates:string[]; lastWeeklyReportAt?:string };
 export type LearningRoute={id:string;name:string;description:string;categories:string[];roleIds?:string[];levels?:CareerLevel[];companyTags?:string[];directionTags?:string[];questionIds?:string[];source?:'built-in'|'jd'|'custom'|'interview';createdAt?:string;updatedAt?:string};
-export type AppSnapshot = { version:7; questions:Question[]; progress:Progress; history:ReviewRecord[]; settings:Settings; interviewReports:InterviewReport[]; interviewRetrospectives:InterviewRetrospective[]; customRoutes:LearningRoute[]; retention:RetentionState };
+export type AppSnapshot = { version:8; questions:Question[]; progress:Progress; history:ReviewRecord[]; settings:Settings; interviewReports:InterviewReport[]; interviewRetrospectives:InterviewRetrospective[]; customRoutes:LearningRoute[]; retention:RetentionState };
 export const DEFAULT_RETENTION:RetentionState={streakFreezes:1,freezeDates:[]};
 export const DEFAULT_SETTINGS:Settings={ dailyGoal:20,dailyNewLimit:5,targetRetention:.9,reminderTime:'20:00',notifications:false,model:'gpt-4.1-mini',dailyAiLimit:30,aiEvaluationEnabled:true,selectedRoute:'java-backend',compactMobile:false,adaptiveDailyGoal:true,weeklyGoal:5,targetDate:'',interviewPlanEnabled:false,interviewFinalReviewDays:4,dailyMinutes:30,prompts:DEFAULT_PROMPTS };
 const JAVA_BACKEND_CATEGORIES=['Java 基础','面向对象','集合框架','Java IO','Java 新特性','JVM','Java 并发','Spring','Spring Boot','MyBatis','数据库','Redis','消息队列','分布式','系统设计'];
@@ -340,12 +340,12 @@ export function isCardAvailable(question:Question,now=new Date()){
 }
 
 export function createSnapshot(questions:Question[],progress:Progress,history:ReviewRecord[],settings:Settings,interviewReports:InterviewReport[],customRoutes:LearningRoute[]=[],retention:RetentionState=DEFAULT_RETENTION,interviewRetrospectives:InterviewRetrospective[]=[]):AppSnapshot {
-  return {version:7,questions:questions.map(normalizeQuestion),progress,history,settings:{...DEFAULT_SETTINGS,...settings,prompts:{...DEFAULT_PROMPTS,...settings.prompts}},interviewReports,interviewRetrospectives,customRoutes,retention:{...DEFAULT_RETENTION,...retention,freezeDates:[...(retention.freezeDates||[])]}};
+  return {version:8,questions:questions.map(normalizeQuestion),progress,history,settings:{...DEFAULT_SETTINGS,...settings,prompts:{...DEFAULT_PROMPTS,...settings.prompts}},interviewReports,interviewRetrospectives,customRoutes,retention:{...DEFAULT_RETENTION,...retention,freezeDates:[...(retention.freezeDates||[])]}};
 }
 
 export function mergeBuiltInQuestions(questions:Question[]) {
   const existing=new Map(questions.map(item=>[item.id,normalizeQuestion(item)]));
-  for(const item of DEFAULT_QUESTIONS){const normalized=normalizeQuestion(item);const current=existing.get(item.id);if(!current)existing.set(item.id,normalized);else existing.set(item.id,{...normalized,...current,routeIds:[...new Set([...(normalized.routeIds||[]),...(current.routeIds||[])])],roleIds:[...new Set([...(normalized.roleIds||[]),...(current.roleIds||[])])],levels:[...new Set([...(normalized.levels||[]),...(current.levels||[])])],companyTags:[...new Set([...(normalized.companyTags||[]),...(current.companyTags||[])])],directionTags:[...new Set([...(normalized.directionTags||[]),...(current.directionTags||[])])]});}
+  for(const item of DEFAULT_QUESTIONS){const normalized=normalizeQuestion(item);const current=existing.get(item.id);if(!current){existing.set(item.id,normalized);continue;}const isOfficial=Boolean(current.source&&/^(内置 Java 知识库|官方职业题库|权威文档校准题库)/.test(current.source));const refresh=isOfficial&&(current.bankVersion||1)<(normalized.bankVersion||1);const content=refresh?{...current,...normalized,favorite:current.favorite,suspended:current.suspended,buriedUntil:current.buriedUntil}:current;existing.set(item.id,{...normalized,...content,routeIds:[...new Set([...(normalized.routeIds||[]),...(content.routeIds||[])])],roleIds:[...new Set([...(normalized.roleIds||[]),...(content.roleIds||[])])],levels:[...new Set([...(normalized.levels||[]),...(content.levels||[])])],companyTags:[...new Set([...(normalized.companyTags||[]),...(content.companyTags||[])])],directionTags:[...new Set([...(normalized.directionTags||[]),...(content.directionTags||[])])]});}
   return [...existing.values()];
 }
 

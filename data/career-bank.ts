@@ -2,10 +2,16 @@ import type { CareerLevel, Question } from '../lib/model.ts';
 
 type Seed = [category:string,title:string,hint:string,keyPoints:string[],reference:string,level:CareerLevel,directions?:string[]];
 
+function detailedReference(seed:Seed){
+  const [category,title,,keyPoints,reference]=seed;
+  const approach=title.includes('区别')||title.includes('比较')?'使用一致的比较维度说明差异，并给出各自适用场景。':title.includes('为什么')?'先给结论，再解释因果关系和成立条件。':title.includes('如何')||title.includes('怎样')?'按目标、步骤、风险和验证结果组织答案。':'按定义、机制、应用和边界组织答案。';
+  return `核心结论\n${reference}\n\n关键点拆解\n${keyPoints.map((point,index)=>`${index+1}. ${point}`).join('\n')}\n\n理解与作答\n这是一道“${category}”知识题，建议${approach}回答时既要说明正常路径，也要指出限制或常见风险。`;
+}
+
 function bank(roleId:string,prefix:string,seeds:Seed[]):Question[]{
   return seeds.map((seed,index)=>({
-    id:`${prefix}-${String(index+1).padStart(3,'0')}`,category:seed[0],title:seed[1],hint:seed[2],keyPoints:seed[3],reference:seed[4],difficulty:seed[5]==='junior'?1:seed[5]==='mid'?2:3,
-    strength:30,tags:[seed[0],seed[5]==='junior'?'初级':seed[5]==='mid'?'中级':'高级'],routeIds:[roleId],roleIds:[roleId],levels:[seed[5]],directionTags:seed[6]||[],bankVersion:1,source:'官方职业题库',
+    id:`${prefix}-${String(index+1).padStart(3,'0')}`,category:seed[0],title:seed[1],hint:seed[2],keyPoints:seed[3],reference:detailedReference(seed),difficulty:seed[5]==='junior'?1:seed[5]==='mid'?2:3,
+    strength:30,tags:[seed[0],seed[5]==='junior'?'初级':seed[5]==='mid'?'中级':'高级'],routeIds:[roleId],roleIds:[roleId],levels:[seed[5]],directionTags:seed[6]||[],bankVersion:3,source:'官方职业题库 v3',
   }));
 }
 
