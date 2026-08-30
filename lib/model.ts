@@ -77,7 +77,7 @@ export type ReviewRecord = {
 
 export type Settings = {
   dailyGoal:number; dailyNewLimit:number; targetRetention:number; reminderTime:string; notifications:boolean;
-  model:string; dailyAiLimit:number; selectedRoute:string; compactMobile:boolean; adaptiveDailyGoal:boolean; weeklyGoal:number; targetDate:string;
+  model:string; dailyAiLimit:number; aiEvaluationEnabled:boolean; selectedRoute:string; compactMobile:boolean; adaptiveDailyGoal:boolean; weeklyGoal:number; targetDate:string;
   interviewPlanEnabled:boolean; interviewFinalReviewDays:number; dailyMinutes:number;
   prompts:PromptTemplates;
 };
@@ -99,7 +99,7 @@ export type RetentionState={ streakFreezes:number; freezeDates:string[]; lastWee
 export type LearningRoute={id:string;name:string;description:string;categories:string[];roleIds?:string[];levels?:CareerLevel[];companyTags?:string[];directionTags?:string[];questionIds?:string[];source?:'built-in'|'jd'|'custom'|'interview';createdAt?:string;updatedAt?:string};
 export type AppSnapshot = { version:7; questions:Question[]; progress:Progress; history:ReviewRecord[]; settings:Settings; interviewReports:InterviewReport[]; interviewRetrospectives:InterviewRetrospective[]; customRoutes:LearningRoute[]; retention:RetentionState };
 export const DEFAULT_RETENTION:RetentionState={streakFreezes:1,freezeDates:[]};
-export const DEFAULT_SETTINGS:Settings={ dailyGoal:20,dailyNewLimit:5,targetRetention:.9,reminderTime:'20:00',notifications:false,model:'gpt-4.1-mini',dailyAiLimit:30,selectedRoute:'java-backend',compactMobile:false,adaptiveDailyGoal:true,weeklyGoal:5,targetDate:'',interviewPlanEnabled:false,interviewFinalReviewDays:4,dailyMinutes:30,prompts:DEFAULT_PROMPTS };
+export const DEFAULT_SETTINGS:Settings={ dailyGoal:20,dailyNewLimit:5,targetRetention:.9,reminderTime:'20:00',notifications:false,model:'gpt-4.1-mini',dailyAiLimit:30,aiEvaluationEnabled:true,selectedRoute:'java-backend',compactMobile:false,adaptiveDailyGoal:true,weeklyGoal:5,targetDate:'',interviewPlanEnabled:false,interviewFinalReviewDays:4,dailyMinutes:30,prompts:DEFAULT_PROMPTS };
 const JAVA_BACKEND_CATEGORIES=['Java 基础','面向对象','集合框架','Java IO','Java 新特性','JVM','Java 并发','Spring','Spring Boot','MyBatis','数据库','Redis','消息队列','分布式','系统设计'];
 export const LEARNING_ROUTES:LearningRoute[]=[
   { id:'java-backend',name:'Java 后端核心词书',description:'按基础、JVM、框架、数据与分布式逐步引入新知识',categories:JAVA_BACKEND_CATEGORIES,source:'built-in' },

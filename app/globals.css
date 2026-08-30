@@ -45,6 +45,7 @@ button,textarea,input,select { font:inherit; } button { cursor:pointer; }
 .answer-box { border-top:1px solid var(--line); padding-top:19px; }
 .answer-box textarea { width:100%; height:108px; padding:0; resize:none; border:0; outline:none; color:#353730; background:transparent; font-size:14px; line-height:1.75; }
 .answer-box textarea::placeholder { color:#b4b6ae; } .answer-actions { display:flex; justify-content:space-between; align-items:center; }
+.self-review-entry{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:22px 0 4px;border-top:1px solid var(--line)}.self-review-entry p{margin:0;color:#777a72;font-size:11px;line-height:1.7}.self-review-entry .submit-button{flex:0 0 auto}.self-review-panel{padding-top:12px}.self-review-panel h4{margin:8px 0 12px;font-size:18px}.self-review-panel .reference-answer{padding:17px;font-size:11px;line-height:1.8}.ai-evaluation-toggle{padding:12px 14px;background:#f0edff}.ai-evaluation-toggle input{width:17px!important;height:17px;accent-color:#6753da}
 .voice-button { display:flex; align-items:center; gap:9px; padding:9px 12px; border:0; background:transparent; color:#696d64; font-size:12px; }
 .record-dot { color:#e05e65; } .voice-button.listening .record-dot { animation:pulse 1s infinite; } @keyframes pulse { 50% { opacity:.25; transform:scale(1.35) } }
 .answer-actions>small { margin-left:auto; margin-right:16px; color:#aaa; font-size:9px; }
