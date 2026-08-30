@@ -9,7 +9,7 @@
 [在线体验](https://yihe-memory.leo527952.chatgpt.site/) · [产品演示](media/demo-video/out/yihe-demo-landscape.mp4) · [学习机制](docs/LEARNING_METHOD.md) · [本地运行](#快速开始)
 
 [![CI](https://github.com/keii-2596/yihe-memory/actions/workflows/ci.yml/badge.svg)](https://github.com/keii-2596/yihe-memory/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-6654dc.svg)](LICENSE)
+[![License: BSL 1.1](https://img.shields.io/badge/license-BSL%201.1-6654dc.svg)](LICENSE)
 ![Local first](https://img.shields.io/badge/data-local--first-dfff45.svg)
 
 </div>
@@ -48,7 +48,7 @@ pnpm verify
 
 - **主动回忆与间隔重复**：分级提示、按需查看答案、每日新学/复习上限、到期复习优先、积压保护，以及 Anki 式撤销、隐藏、暂停和恢复。
 - **AI 判题与表达训练**：文字或语音回答、概念覆盖检查、表达建议、面试官追问、本地评分回退和每日 AI 调用额度。
-- **题库与学习词书**：213 个内置技术面试知识点，覆盖 Java、前端、Go、Python、测试和 SRE；支持按岗位、难度与公司方向选择或自定义词书。
+- **题库与学习词书**：643 个内置技术面试知识点，覆盖 Java、前端、Go、Python、测试和 SRE；支持按岗位、难度与公司方向选择或自定义词书。
 - **从真实材料生成学习内容**：从 JD、Markdown、CSV、JSON、网页和 PDF 制卡，支持前端自定义判题、追问、制卡、转写和复盘 Prompt。
 - **面试复盘**：上传面试录音或文字稿，由 AI 提炼薄弱点，生成复习题、行动计划和专属词书；原始录音不会长期保存。
 - **学习数据与长期使用**：回答历史、同题对比、个人预计记住率、六周日历、学习周报、完成预测、提醒、离线缓存、备份迁移和 PWA。
@@ -92,6 +92,6 @@ pnpm verify
 
 欢迎补充高质量面试知识点、修正文案和答案、完善学习算法，或改进可访问性与跨端体验。开始前请阅读 [贡献指南](CONTRIBUTING.md)。
 
-## 开源许可
+## 许可证
 
-[MIT](LICENSE) © 2026 keii-2596
+[Business Source License 1.1](LICENSE) © 2026 keii-2596。允许学习、研究、修改、再分发和非生产使用；生产使用需要另行取得商业授权。当前版本最迟于 2030-08-30 自动转换为 GPL-2.0-or-later。
