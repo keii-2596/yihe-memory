@@ -88,6 +88,8 @@ test('built-in Java bank is complete and structurally valid', () => {
     assert.ok(item.category); assert.ok(item.title); assert.ok(item.hint); assert.ok(item.reference.length>=20,`${item.id} needs a useful reference answer`);
     assert.ok(item.keyPoints.length>=3,`${item.id} needs at least 3 key points`);
     assert.ok([1,2,3].includes(item.difficulty));
+    assert.ok(item.roleIds?.length,`${item.id} needs a role`);
+    assert.ok(item.levels?.length,`${item.id} needs a career level`);
   }
   const categories=new Set(DEFAULT_QUESTIONS.map(item=>item.category));
   for(const required of ['Java 基础','集合框架','JVM','Java 并发','Spring','数据库','Redis','分布式']) assert.ok(categories.has(required));

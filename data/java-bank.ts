@@ -173,5 +173,7 @@ export const JAVA_QUESTION_BANK:Question[]=seeds.map(([category,title,points,ref
   category,title,
   hint:'建议按“定义或结论 → 核心原理 → 使用场景与边界”组织回答。',
   keyPoints:points.split('|'),reference,difficulty,strength:20,
-  tags:['Java 八股',category,...(tags?tags.split(','):[])],favorite:false,routeIds:['java-backend'],prerequisites:[],source:'内置 Java 知识库 v1',
+  tags:['Java 八股',category,...(tags?tags.split(','):[])],favorite:false,
+  routeIds:['java-backend'],roleIds:['java-backend'],levels:[difficulty===1?'junior':difficulty===2?'mid':'senior'],
+  directionTags:['Java 后端'],prerequisites:[],bankVersion:2,source:'内置 Java 知识库 v2',
 }));
