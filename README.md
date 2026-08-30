@@ -2,6 +2,12 @@
 
 面向 Java 面试知识的开源 AI 间隔重复学习应用。用户用文字或语音回答开放题，系统按概念覆盖、准确性与表达质量给出反馈，再通过个性化间隔调度安排复习。
 
+## 产品演示
+
+[![忆核横屏产品演示](media/demo-video/out/yihe-demo-landscape-preview.gif)](media/demo-video/out/yihe-demo-landscape.mp4)
+
+点击上方预览观看完整的 [16:9 中文旁白演示视频](media/demo-video/out/yihe-demo-landscape.mp4)。另有适合短视频平台的 [9:16 竖屏版本](media/demo-video/out/yihe-demo.mp4)。
+
 ## 核心能力
 
 - 163 道内置 Java 八股卡片，覆盖语言基础、集合、JVM、并发、Spring、数据库、Redis、消息队列、分布式与系统设计
