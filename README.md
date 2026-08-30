@@ -1,88 +1,96 @@
+<div align="center">
+
 # 忆核（Yihe Memory）
 
-面向 Java 面试知识的开源 AI 间隔重复学习应用。用户用文字或语音回答开放题，系统按概念覆盖、准确性与表达质量给出反馈，再通过个性化间隔调度安排复习。
+### 把“我好像会”，练成“我能在面试中讲清”
 
-## 产品演示
+面向技术面试的 AI 主动回忆与间隔重复学习工具。用文字或语音回答开放题，获得针对概念覆盖、准确性和表达质量的反馈，再按个人记忆状态安排下一次复习。
 
-[![忆核横屏产品演示](media/demo-video/out/yihe-demo-landscape-preview.gif)](media/demo-video/out/yihe-demo-landscape.mp4)
+[在线体验](https://yihe-memory.leo527952.chatgpt.site/) · [产品演示](media/demo-video/out/yihe-demo-landscape.mp4) · [学习机制](docs/LEARNING_METHOD.md) · [本地运行](#快速开始)
 
-点击上方预览观看完整的 [16:9 中文旁白演示视频](media/demo-video/out/yihe-demo-landscape.mp4)。另有适合短视频平台的 [9:16 竖屏版本](media/demo-video/out/yihe-demo.mp4)。
+[![CI](https://github.com/keii-2596/yihe-memory/actions/workflows/ci.yml/badge.svg)](https://github.com/keii-2596/yihe-memory/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-6654dc.svg)](LICENSE)
+![Local first](https://img.shields.io/badge/data-local--first-dfff45.svg)
 
-## 核心能力
+</div>
 
-- 163 道内置 Java 八股卡片，覆盖语言基础、集合、JVM、并发、Spring、数据库、Redis、消息队列、分布式与系统设计
-- 官方与自定义学习词书：支持复制、改名、增删知识点，以及从 JD 自动生成
-- 面试复盘：上传录音或文字稿，由 AI 提取薄弱知识并生成复习题与专属词书
-- Prompt 工作台：判题、追问、制卡、JD、转写和复盘均可在前端自定义提示词
-- AI 判题、个人 API 配置与连通性测试、参考答案自查、追问、本地评分回退与每日调用额度
-- 文字回答、浏览器语音识别与服务端录音转写
-- 分级提示、按需查看答案、间隔重复与个人预计记住率
-- Anki 式免费复习控制：撤销上次复习、今天隐藏、暂停/恢复、反复遗忘筛选与自定义学习
-- 每日新学/复习独立上限、复习积压保护、提醒与日历订阅
-- Java、前端、Go、Python、测试、SRE 六类岗位题库，以及初级/中级/高级和公司方向路线
-- 粘贴 JD 生成个人路线；从 Markdown、CSV、JSON、公开网页和 PDF 生成记忆卡
-- 动态任务量、学习周报、六周日历、完成预测、隐私分享和连续学习补签卡
-- 浏览器、邮箱和企业微信群提醒（邮箱/群提醒需要部署者配置发送服务）
-- 回答历史、同题对比、掌握度统计与反复遗漏诊断
-- JSON / CSV / Markdown 导入、AI 从材料制卡、知识包分享
-- 匿名本机模式，以及可选 ChatGPT、GitHub、Google、邮箱、Cloudflare Access 和自托管 SSO 接入
-- D1 账号隔离同步、离线缓存和每日版本备份；原始面试录音不会长期保存
-- PWA、移动端布局、键盘操作与无障碍焦点样式
+[![忆核产品演示](media/demo-video/out/yihe-demo-landscape-preview.gif)](media/demo-video/out/yihe-demo-landscape.mp4)
+
+点击预览观看完整的 [16:9 中文旁白演示](media/demo-video/out/yihe-demo-landscape.mp4)，也可以下载适合短视频平台的 [9:16 竖屏版本](media/demo-video/out/yihe-demo.mp4)。
+
+## 为什么是忆核
+
+- **主动回忆，而不是浏览答案**：先独立组织表达，忘记时再逐层查看提示和参考答案。
+- **开放式回答也能获得反馈**：AI 或本地规则检查核心概念、准确性和表达结构，不要求死记标准措辞。
+- **每一次回答都会影响复习计划**：根据个人复习记录、记忆稳定性和经过时间估算记住率；未学习内容不会获得虚假的预设分数。
 
 ## 快速开始
 
 需要 Node.js 22 和 pnpm 10：
 
 ```bash
+git clone https://github.com/keii-2596/yihe-memory.git
+cd yihe-memory
 pnpm install
 cp .env.example .env.local
 pnpm dev
 ```
 
-未配置 AI 密钥时应用仍可完整运行，并使用本地评分算法。提交改动前运行：
+打开 [http://localhost:3000](http://localhost:3000) 即可开始学习。AI 密钥是可选项；未配置时，题库、词书、间隔重复、导入导出和本地评分仍可使用。
+
+提交改动前运行：
 
 ```bash
 pnpm verify
 ```
 
-## AI 配置
+## 核心能力
 
-服务端接口默认兼容 OpenAI Chat Completions：
+- **主动回忆与间隔重复**：分级提示、按需查看答案、每日新学/复习上限、到期复习优先、积压保护，以及 Anki 式撤销、隐藏、暂停和恢复。
+- **AI 判题与表达训练**：文字或语音回答、概念覆盖检查、表达建议、面试官追问、本地评分回退和每日 AI 调用额度。
+- **题库与学习词书**：213 个内置技术面试知识点，覆盖 Java、前端、Go、Python、测试和 SRE；支持按岗位、难度与公司方向选择或自定义词书。
+- **从真实材料生成学习内容**：从 JD、Markdown、CSV、JSON、网页和 PDF 制卡，支持前端自定义判题、追问、制卡、转写和复盘 Prompt。
+- **面试复盘**：上传面试录音或文字稿，由 AI 提炼薄弱点，生成复习题、行动计划和专属词书；原始录音不会长期保存。
+- **学习数据与长期使用**：回答历史、同题对比、个人预计记住率、六周日历、学习周报、完成预测、提醒、离线缓存、备份迁移和 PWA。
 
-- `AI_EVALUATION_ENDPOINT`
-- `AI_EVALUATION_API_KEY`
-- `AI_EVALUATION_MODEL`
-- `AI_ALLOWED_ENDPOINT_HOSTS`（允许个人配置使用的额外 HTTPS 域名，逗号分隔）
-- `AI_TRANSCRIPTION_ENDPOINT`
-- `AI_TRANSCRIPTION_MODEL`
-- `NEXT_PUBLIC_SITE_ORIGIN`
+## 学习流程
 
-部署者密钥只保存在服务端，`GET /api/evaluate` 不会返回任何密钥。用户也可以在“设置 → AI 判题 → 配置个人 API”中填写 OpenAI Chat Completions 兼容接口、Key 和模型并测试连接。个人 Key 只进入当前标签页的 `sessionStorage`，判题时经站内服务端临时转发，不进入 D1 云同步、导出备份或服务器日志；关闭标签页后自动清除。
+```text
+选择词书 → 安排到期复习与少量新题 → 主动回答
+        → AI / 本地反馈 → 自评掌握程度 → 计算下次复习时间
+        → 面试复盘生成新题 → 进入下一轮训练
+```
 
-个人接口默认允许 OpenAI、DeepSeek、Moonshot、智谱 GLM 和阿里百炼的官方 HTTPS 域名。自托管兼容接口需要部署者把精确域名加入 `AI_ALLOWED_ENDPOINT_HOSTS`；服务端拒绝 HTTP、凭据式 URL、查询参数、非标准端口和重定向，以降低 SSRF 风险。
+系统始终先安排已经到期的复习，再从当前词书引入新知识。预计记住率只使用当前用户的学习记录，不读取 MOOC 分数或其他用户的数据。详细规则见 [学习机制说明](docs/LEARNING_METHOD.md)。
 
-## 账号方案
+## AI 与隐私
 
-默认无需注册，学习数据只在本机保存。开源部署者可以选择：
+- 部署者可以配置兼容 OpenAI Chat Completions 的服务端接口；用户也可以在设置页填写自己的接口、Key 和模型。
+- 个人 Key 只保存在当前标签页的 `sessionStorage`，不会进入云同步、学习备份或服务器日志，关闭标签页后自动清除。
+- 服务端密钥不会通过查询接口返回；个人接口会经过 HTTPS、域名、端口和重定向限制，降低 SSRF 风险。
+- 不配置任何 AI 服务时，应用仍会使用本地规则完成基础评估。
 
-- OpenAI Sites 的 ChatGPT 身份；
-- oauth2-proxy、Authelia、Authentik 或企业网关提供的可信身份头；
-- Cloudflare Access；
-- Auth.js、Supabase、Clerk 等承载的 GitHub、Google 或邮箱登录页。
+可用环境变量和默认值以 [`.env.example`](.env.example) 为准。身份信任边界与部署要求见 [认证接入文档](docs/AUTHENTICATION.md)。
 
-详细安全边界与环境变量见 [认证接入文档](docs/AUTHENTICATION.md)。仅填写 GitHub/Google 登录 URL 不会自动完成 OAuth；身份仍必须由可信服务验证后传给应用。
+## 文档
 
-所有身份头默认不受信任。Sites 部署需要显式开启 `AUTH_TRUST_CHATGPT_HEADERS`；其他部署只应开启自己已用网关保护的身份方式。
+| 文档 | 内容 |
+| --- | --- |
+| [学习机制](docs/LEARNING_METHOD.md) | 每日任务、词书、记住率与间隔重复 |
+| [题库说明](docs/QUESTION_BANK.md) | 题库结构、分类、难度与升级规则 |
+| [认证接入](docs/AUTHENTICATION.md) | ChatGPT、GitHub、Google、企业网关与自托管 SSO |
+| [留存与提醒](docs/RETENTION_AND_REMINDERS.md) | 浏览器、邮箱、企业微信群和日历提醒 |
+| [Android 客户端](android/README.md) | Trusted Web Activity 构建与安装 |
+| [贡献指南](CONTRIBUTING.md) | 本地开发、补题、纠错和提交变更 |
+| [安全策略](SECURITY.md) | 私密报告安全问题 |
 
-## 题库与贡献
+## 部署与数据
 
-题库结构、分类和升级规则见 [Java 题库说明](docs/QUESTION_BANK.md)，每日任务、学习词书与记忆指标见 [学习机制说明](docs/LEARNING_METHOD.md)。欢迎按 [贡献指南](CONTRIBUTING.md) 补题、纠错和改进功能。安全问题请遵循 [安全策略](SECURITY.md) 私密报告。
+项目使用 Next.js/Vinext，可部署到 OpenAI Sites 或兼容 Cloudflare Workers 的环境。默认无需注册，学习数据保存在本机；绑定 D1 并接入可信身份后，可以开启账号隔离的跨设备同步。未绑定云存储时仍可作为完整的本地优先应用使用。
 
-## 部署与存储
+## 参与贡献
 
-项目使用 Next.js/Vinext，可部署到 OpenAI Sites 或兼容 Cloudflare Workers 的环境。持久化云同步需要 D1；不绑定云存储时仍可作为本地优先应用使用。
-
-留存与多渠道提醒的部署方式见 [留存与提醒文档](docs/RETENTION_AND_REMINDERS.md)。可安装 Android 客户端工程位于 [`android/`](android/README.md)，采用 Android 官方推荐的 Trusted Web Activity，与网页共用登录和云数据。
+欢迎补充高质量面试知识点、修正文案和答案、完善学习算法，或改进可访问性与跨端体验。开始前请阅读 [贡献指南](CONTRIBUTING.md)。
 
 ## 开源许可
 
