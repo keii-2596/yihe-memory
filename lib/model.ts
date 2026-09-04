@@ -2,6 +2,7 @@ import { JAVA_QUESTION_BANK } from '../data/java-bank.ts';
 import { CAREER_QUESTION_BANK } from '../data/career-bank.ts';
 import { EXPANDED_QUESTION_BANK } from '../data/expanded-bank.ts';
 import { Rating as FsrsRating, State as FsrsState, createEmptyCard, fsrs, type Card as FsrsCard, type Grade as FsrsGrade } from 'ts-fsrs';
+import { OPTIMIZED_PROMPTS } from './prompt-defaults.ts';
 
 export type Rating = 'again' | 'hard' | 'good' | 'easy';
 export type CareerLevel = 'junior' | 'mid' | 'senior';
@@ -84,7 +85,7 @@ export type Settings = {
 
 export type PromptKey='evaluate'|'followup'|'cardGeneration'|'jdRoute'|'transcription'|'interviewReview';
 export type PromptTemplates=Record<PromptKey,string>;
-export const DEFAULT_PROMPTS:PromptTemplates={
+const LEGACY_DEFAULT_PROMPTS:PromptTemplates={
   evaluate:'你是一名严格但鼓励式的计算机面试教练。请评价候选人对“{question}”的回答。关注概念覆盖、逻辑准确和表达清晰，不要求逐字匹配。评分要点：{keyPoints}\n参考答案：{reference}\n候选人回答：{answer}\n只输出约定的 JSON。',
   followup:'你是计算机面试官。请基于原题“{question}”、候选人回答“{answer}”和遗漏点“{missedPoints}”，只给出一个自然、具体、能检验真实理解的中文追问，不要解释。',
   cardGeneration:'从下面材料中生成最多 {count} 张计算机面试记忆卡。问题必须可独立理解，参考答案必须忠于材料，并给出 2—6 个可评分要点。材料：\n{material}',
@@ -92,6 +93,12 @@ export const DEFAULT_PROMPTS:PromptTemplates={
   transcription:'请准确转写这段中文技术面试录音。保留技术名词、问题与回答的边界；不确定的词不要擅自补写。',
   interviewReview:'你是一名资深技术面试教练。分析“{role}”面试的文字稿，找出表现亮点、知识薄弱点和被问到但回答不完整的主题，并生成可用于间隔复习的题目。不要猜测文字稿中没有的信息。文字稿：\n{transcript}',
 };
+export const DEFAULT_PROMPTS:PromptTemplates={...OPTIMIZED_PROMPTS};
+export function upgradePrompts(prompts?:Partial<PromptTemplates>):PromptTemplates{
+  const incoming=prompts||{};const upgraded={...DEFAULT_PROMPTS,...incoming};
+  (Object.keys(DEFAULT_PROMPTS) as PromptKey[]).forEach(key=>{if(!incoming[key]||incoming[key]===LEGACY_DEFAULT_PROMPTS[key])upgraded[key]=DEFAULT_PROMPTS[key];});
+  return upgraded;
+}
 
 export type InterviewReport = { id:string; role:string; questionIds:string[]; scores:number[]; startedAt:string; completedAt:string; durationSeconds:number };
 export type InterviewRetrospective={id:string;createdAt:string;role:string;summary:string;overallFeedback:string;strengths:string[];weaknesses:string[];topics:{name:string;category:string;evidence:string;priority:'high'|'medium'|'low'}[];actionPlan:string[];questionIds:string[];transcriptPreview:string;source:'ai'|'local';model?:string};
@@ -340,7 +347,7 @@ export function isCardAvailable(question:Question,now=new Date()){
 }
 
 export function createSnapshot(questions:Question[],progress:Progress,history:ReviewRecord[],settings:Settings,interviewReports:InterviewReport[],customRoutes:LearningRoute[]=[],retention:RetentionState=DEFAULT_RETENTION,interviewRetrospectives:InterviewRetrospective[]=[]):AppSnapshot {
-  return {version:8,questions:questions.map(normalizeQuestion),progress,history,settings:{...DEFAULT_SETTINGS,...settings,prompts:{...DEFAULT_PROMPTS,...settings.prompts}},interviewReports,interviewRetrospectives,customRoutes,retention:{...DEFAULT_RETENTION,...retention,freezeDates:[...(retention.freezeDates||[])]}};
+  return {version:8,questions:questions.map(normalizeQuestion),progress,history,settings:{...DEFAULT_SETTINGS,...settings,prompts:upgradePrompts(settings.prompts)},interviewReports,interviewRetrospectives,customRoutes,retention:{...DEFAULT_RETENTION,...retention,freezeDates:[...(retention.freezeDates||[])]}};
 }
 
 export function mergeBuiltInQuestions(questions:Question[]) {
